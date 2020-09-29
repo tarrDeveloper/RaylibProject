@@ -1,5 +1,13 @@
 #include "raylib.h"
-    
+#include "silentradiancesimple.h"
+
+// GLOBALS STRUCT
+struct Globals
+{
+    int WINDOWWIDTH = 540;
+    int WINDOWHEIGHT = 960;
+} globals;
+
 // SHIP CLASS
 class PlayerShip
 {
@@ -59,8 +67,10 @@ class PlayerShip
         // functions that get values
         int X() {return this->x; }
         int Y() {return this->y; }
+        int Column() {return this->column; }
 };
 
+// ASTEROID MANAGER CLASS
 class AsteroidManager
 {
     // stores the positions of all the asteroids (10 max asteroids)
@@ -84,28 +94,31 @@ class AsteroidManager
                 if (this->column[i] != -1)
                 {
                     this->y[i]+=8;
-                    if (this->y[i]>960)
+                    if (this->y[i]>992)
                     {
-                        this->y[i] = -32;
                         this->column[i] = GetRandomValue(0,2);
+                        this->y[i] = -32;   
                     }
                 }
             }
         }
         void Draw(int OFFX = 0, int OFFY = 0)
         {
-            for(int i=0;i<10;i++)
+            for(int i=0;i<5;i++)
             {
                 DrawCircle((270+((this->column[i])-1)*180)+OFFX,this->y[i]+OFFY,24,BROWN);
             }
         }
+        // functions that get values
+        int Y(int i) {return this->y[i]; }
+        int Column(int i) {return this->column[i]; }
 };
 
 // MAIN
 int main(void)
 {
     // Init window
-    InitWindow(540, 960, "");
+    InitWindow(globals.WINDOWWIDTH, globals.WINDOWHEIGHT, "");
     SetTargetFPS(60);
     
     // Init the ship
@@ -120,6 +133,14 @@ int main(void)
         // Update
         asteroidManager.Update();
         playerShip.Update();
+        
+        for(int i=0;i<5;i++)
+        {
+            if ((asteroidManager.Y(i) > 944) and (asteroidManager.Column(i) == playerShip.Column()))
+            {
+                // COLLISION
+            }
+        }
 
         // Draw
         BeginDrawing();
