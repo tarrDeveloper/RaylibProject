@@ -1,5 +1,71 @@
 #include "raylib.h"
+
+
+
+#define SILENTRADIANCE_ON
+
+#ifdef SILENTRADIANCE_ON
+/* Extern C tells the compiler this is C code instead of C++ code
+There are minor differences on how parameters are handled
+and function calls are done.
+*/
+extern "C" {
 #include "silentradiancesimple.h"
+
+#include <math.h>   
+#include <pthread.h>
+
+#ifndef logit
+#define logit(...) {fprintf(stderr,__VA_ARGS__);fprintf(stderr,"\n");}
+#endif
+
+
+
+
+void *SoundPlay(void *arg)
+{
+init_receiver_sound(1);
+
+while (1) {
+  playOneSoundBuffer();
+  }
+return NULL;
+}
+
+void InitSilentRadiance(char *url) {
+init_web_stream(url);
+init_processor();
+    {
+      pthread_t tid[1];
+      int err;
+      err = pthread_create(tid,NULL,&SoundPlay,NULL);
+      if (err != 0) 
+         logit("\ncan't create thread :[%s]", strerror(err));
+      }
+}
+
+#define PACKETMAXSIZE 4000
+
+static unsigned char packetbuffer[PACKETMAXSIZE];
+static int recvStringLen;
+
+void DoSilentRadiance() {
+
+if(we_are_streaming_web==-1) {return;}
+  
+int i;
+for (i=0;i<5;i++) {
+  if (get_packet_from_web_stream(&recvStringLen,packetbuffer)) {
+    process_packet(recvStringLen,packetbuffer);
+    }
+  else return;
+  }  
+}
+
+
+} /* extern C */
+#endif //SILENTRADIANCE_ON
+
 
 // GLOBALS STRUCT
 struct Globals
@@ -120,7 +186,12 @@ int main(void)
     // Init window
     InitWindow(globals.WINDOWWIDTH, globals.WINDOWHEIGHT, "");
     SetTargetFPS(60);
-    
+
+#ifdef SILENTRADIANCE_ON
+    // InitSilentRadiance
+    InitSilentRadiance("https://pt.silentradiance.com/download.cgi");
+#endif
+        
     // Init the ship
     PlayerShip playerShip = PlayerShip(1);
     
@@ -130,6 +201,9 @@ int main(void)
     // Main game loop
     while (!WindowShouldClose())    // Detect window close button or ESC key
     {
+#ifdef SILENTRADIANCE_ON
+    	DoSilentRadiance();
+#endif
         // Update
         asteroidManager.Update();
         playerShip.Update();
@@ -153,3 +227,7 @@ int main(void)
     CloseWindow();        // Close window and OpenGL context
     return 0;
 }
+
+
+
+/* end of main.cpp */

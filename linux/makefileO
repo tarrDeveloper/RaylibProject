@@ -1,0 +1,18 @@
+
+main:	main.o simple_curl_web_stream.o simple_decrypt.o simple_processor.o simple_seven_eight_decode.o simple_sound_alsa.o
+	 gcc  -g -O2 -Wl,-rpath -Wl,LIBDIR  -o main  main.o -L/usr/local/lib /home/hib/my/ben/silentradiancesimple/src/.libs/libsilentradiancesimple.a  \
+	    /usr/lib/x86_64-linux-gnu/libcurl.so -lasound -lopus -lm -lraylib -lGL -lpthread -ldl -lrt -lX11 -DPLATFORM_DESKTOP -pthread
+
+main.o:	../main.cpp
+	g++ -c -DPLATFORM_DESKTOP -D_DEFAULT_SOURCE ../main.cpp
+
+simple_curl_web_stream.o: ../simple_curl_web_stream.c
+
+simple_decrypt.o: ../simple_decrypt.c
+
+simple_processor.o: ../simple_processor.c
+
+simple_seven_eight_decode.o: ../simple_seven_eight_decode.c
+
+simple_sound_alsa.o: ../simple_sound_alsa.c
+

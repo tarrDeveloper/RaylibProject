@@ -138,7 +138,7 @@ extern int we_are_streaming_web;  // flag - set to 1 if we are currently streami
 
 
 void init_web_stream(char *url);    // Initialize and open the stream
-int get_packet_from_web_stream();   // Get the packet from the web stream.  7 bit and 8 bit formats are both supported.
+int get_packet_from_web_stream(int *precvStringLen,unsigned char *packetbuffer);   // Get the packet from the web stream.  7 bit and 8 bit formats are both supported.
 void shutdown_web_stream();         // disconnect the web stream, and reset all that.  
 
 
