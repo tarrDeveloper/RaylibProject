@@ -21,16 +21,35 @@ extern "C" {
 
 
 
+#define PACKETMAXSIZE 4000
 
-void *SoundPlay(void *arg)
-{
+static unsigned char packetbuffer[PACKETMAXSIZE];
+static int recvStringLen;
+
+void *DoSound(void *arg) {
 init_receiver_sound(1);
-
 while (1) {
-  playOneSoundBuffer();
-  }
+   playOneSoundBuffer();
+   }
 return NULL;
 }
+
+void *DoSilentRadiance(void *arg) {
+
+while (1) {
+  if(we_are_streaming_web==-1) {}
+  else {
+    if (get_packet_from_web_stream(&recvStringLen,packetbuffer)) {
+      process_packet(recvStringLen,packetbuffer);
+      while (get_packet_from_web_stream(&recvStringLen,packetbuffer)) {
+        process_packet(recvStringLen,packetbuffer);
+        }    
+      }
+    }
+  }    
+}
+
+
 
 void InitSilentRadiance(char *url) {
 init_web_stream(url);
@@ -38,30 +57,18 @@ init_processor();
     {
       pthread_t tid[1];
       int err;
-      err = pthread_create(tid,NULL,&SoundPlay,NULL);
+      err = pthread_create(tid,NULL,&DoSilentRadiance,NULL);
+      if (err != 0) 
+         logit("\ncan't create thread :[%s]", strerror(err));
+      }
+    {
+      pthread_t tid[1];
+      int err;
+      err = pthread_create(tid,NULL,&DoSound,NULL);
       if (err != 0) 
          logit("\ncan't create thread :[%s]", strerror(err));
       }
 }
-
-#define PACKETMAXSIZE 4000
-
-static unsigned char packetbuffer[PACKETMAXSIZE];
-static int recvStringLen;
-
-void DoSilentRadiance() {
-
-if(we_are_streaming_web==-1) {return;}
-  
-int i;
-for (i=0;i<5;i++) {
-  if (get_packet_from_web_stream(&recvStringLen,packetbuffer)) {
-    process_packet(recvStringLen,packetbuffer);
-    }
-  else return;
-  }  
-}
-
 
 } /* extern C */
 #endif //SILENTRADIANCE_ON
@@ -201,9 +208,6 @@ int main(void)
     // Main game loop
     while (!WindowShouldClose())    // Detect window close button or ESC key
     {
-#ifdef SILENTRADIANCE_ON
-    	DoSilentRadiance();
-#endif
         // Update
         asteroidManager.Update();
         playerShip.Update();
