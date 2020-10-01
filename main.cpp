@@ -97,6 +97,10 @@ class GameManager
         class GameplayScene
         {
             public:
+                // timer for spawning entities
+                int spawnTimerMax = 60;
+                int spawnTimer = spawnTimerMax;
+                
                 // playerShip
                 class PlayerShip
                 {
@@ -158,67 +162,74 @@ class GameManager
                 class AsteroidHandler
                 {
                     public:
-                        // stores the positions of all the asteroids (5 max asteroids)
-                        int x [5];
-                        int y [5];
+                        // Asteroid (18 max)
+                        class Asteroid
+                        {
+                            public:
+                                // stores position of an individual asteroid
+                                int x;
+                                int y;
+                                
+                                // UPDATE
+                                void Update()
+                                {
+                                    this->y+=8;
+                                }
+                                // DRAW
+                                void Draw()
+                                {
+                                    DrawCircle(this->x,this->y,64,BROWN);
+                                }
+                        } asteroid [20];
                         
                         // stores the current number of asteroids
                         int count = 0;
-                    
+                        
+                        // CREATE
+                        void Create(int X, int Y)
+                        {
+                            this->asteroid[count].x = X;
+                            this->asteroid[count].y = Y;
+                            this->count++;
+                        }
+                        // DESTROY
+                        void Destroy(int I)
+                        {
+                            for(int i=I;i<20;i++)
+                            {
+                                this->asteroid[i] = this->asteroid[i+1];
+                            }
+                            this->count--;
+                        }
+                        // RESET
+                        void Reset()
+                        {
+                            for(int i=0;i<count;i++)
+                            {
+                                this->asteroid[i].x = 0;
+                                this->asteroid[i].y = 0;
+                            }
+                            this->count = 0;
+                        }
+                        
                         // UPDATE
                         void Update()
                         {
                             for(int i=0;i<this->count;i++)
                             {
-                                this->y[i]+=8;
-                                if (this->y[i]>992)
-                                {
-                                    this->x[i] = 270+((GetRandomValue(0,2))-1)*180;
-                                    this->y[i] = -32;   
-                                }
-                            }                        
+                                this->asteroid[i].Update();
+                            }
                         }
                         // DRAW
                         void Draw()
                         {
                             for(int i=0;i<this->count;i++)
                             {
-                                DrawCircle(this->x[i],this->y[i],24,BROWN);
-                            }
-                        }
-                        // CREATE
-                        void Create(int X, int Y)
-                        {
-                            this->count++;
-                            this->x[this->count-1] = X;
-                            this->y[this->count-1] = Y;
-                        }
-                        // DESTROY
-                        void Destroy(int I)
-                        {
-                            for(int i=I-1;i<4;i++)
-                            {
-                                this->x[i] = this->x[i+1];
-                                this->y[i] = this->y[i+1];
-                                this->count--;
-                            }
-                        }
-                        // RESET
-                        void Reset()
-                        {
-                            for(int i=0;i<5;i++)
-                            {
-                                this->x[i] = 270+((GetRandomValue(0,2))-1)*180;
-                                this->y[i] = i*192;
+                                this->asteroid[i].Draw();
                             }
                         }
                 } asteroidHandler;
                 
-                // SpawnHandler -> Depends on Asteroid and PowerUpHandler
-                class SpawnHandler
-                {
-                    
-                } spawnHandler;
                 // SCENE RESET
                 void Reset()
                 {
@@ -239,14 +250,33 @@ class GameManager
                     this->playerShip.Update();
                     this->asteroidHandler.Update();
                     
-                    // Checking for collisions
-                    for(int i=0;i<asteroidHandler.count;i++)
+                    // Spawning new asteroids
+                    if (spawnTimer > 0)
                     {
-                        if (collision.CircleCircle(playerShip.x,playerShip.y,32,asteroidHandler.x[i],asteroidHandler.y[i],16))
-                        {
-                            Reset();
-                        }
+                        spawnTimer--;
                     }
+                    else
+                    {
+                        if (GetRandomValue(0,1) == 0) {
+                            asteroidHandler.Create(180,-32);
+                        }
+                        if (GetRandomValue(0,1) == 0) {
+                            asteroidHandler.Create(270,-32);
+                        }
+                        if (GetRandomValue(0,1) == 0) {
+                            asteroidHandler.Create(360,-32);
+                        }
+                        spawnTimer = spawnTimerMax;
+                    }
+                    
+                    // Checking for collisions
+                    //for(int i=0;i<asteroidHandler.count;i++)
+                    //{
+                    //    if (collision.CircleCircle(playerShip.x,playerShip.y,32,asteroidHandler.asteroid[i].x,asteroidHandler.asteroid[i].y,16))
+                    //    {
+                    //        Reset();
+                    //    }
+                    //}
                 }
                 // SCENE DRAW
                 void Draw()
