@@ -57,8 +57,17 @@ mingw64 bash
 
 git clone https://github.com/raysan5/raylib.git
 cd raylib/src
-mingw32-make PLATFORM=PLATFORM_DESKTOP  PLATFORM_OS=WINDOWS
+alias as=/usr/bin/x86_64-w64-mingw32-as
 
+Edit Makefile - jus t befor edefine compiler flags, add these three lines:
+CC = /usr/bin/x86_64-w64-mingw32-gcc
+AR = /usr/bin/x86_64-w64-mingw32-ar
+AS = /usr/bin/x86_64-w64-mingw32-as
+
+
+# export PATH=/usr/x86_64-w64-mingw32/bin:$PATH
+make PLATFORM=PLATFORM_DESKTOP  PLATFORM_OS=WINDOWS     RAYLIB_MODULE_AUDIO=TRUE RAYLIB_MODULE_MODELS=TRUE  
+cp libraylib.a raudio.o ../..
 
 
 glfw3
