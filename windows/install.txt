@@ -1,0 +1,72 @@
+
+
+windows. goto www.msys2.org
+Download msys2-x86_64=20200903.exe
+Execute it
+	msys2 management comes up
+Click exit
+	msys2 64 bit setup comes
+	prompts welcome to the msys2 setup wizard
+Click OK
+	Please specify the directory where MSYS2 64-bit will be installed
+c:\msys64, click Next
+	Start menu shortcuts appears/
+Click Next
+	Installing MSYS2 64bit  (takes 10 minutes)
+	Installation finished
+Click next
+	Completing
+Click finish
+msys window opens
+cp c:\USers\hib\Downloads\rayliub-master.zip .
+unzip using file explorer
+pacman -S base-devel
+pacman -S make
+pacman -S gcc
+pacman -S development
+pacman -S mingw-w64-x86_64-toolchain
+pacman -S openssh
+
+
+
+apt-get install mingw-w64 mingw-w64-tools
+apt-get install binutils-mingw-w64
+sudo apt install mingw-w64 gobjc-mingw-w64 gobjc++-mingw-w64-i686 gobjc++-mingw-w64-x86-64 gfortran-mingw-w64 
+sudo apt-get install nasm
+sudo apt-get install autoconf
+
+
+mkdir $HOME/bin
+cat >$HOME/bin/mingw64 << 'EOF'
+#!/bin/sh
+PREFIX=x86_64-w64-mingw32
+unset CFLAGD
+unset CPPFLAGS
+unset LDFLAGS
+export CC=$PREFIX-gcc
+export CXX=$PREFIX-g++
+export CPP=$PREFIX-cpp
+export RANLIB=$PREFIX-ranlib
+export PATH="/usr/x86_64-w64-mingw32/bin:$PATH"
+exec "$@"
+EOF
+chmod u+x $HOME/bin/mingw64
+
+
+mingw64 bash
+
+git clone https://github.com/raysan5/raylib.git
+cd raylib/src
+mingw32-make PLATFORM=PLATFORM_DESKTOP  PLATFORM_OS=WINDOWS
+
+
+
+glfw3
+wget https://github.com/glfw/glfw/releases/download/3.3.2/glfw-3.3.2.zip
+ unzip glfw-3.3.2.zip 
+cd glfw-3.3.2
+
+cmake -DCMAKE_TOOLCHAIN_FILE=CMake/x86_64-w64-mingw32.cmake 
+make
+make install
+cp 

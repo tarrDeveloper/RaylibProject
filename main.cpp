@@ -2,7 +2,7 @@
 
 
 
-#define SILENTRADIANCE_ON
+//#define SILENTRADIANCE_ON
 
 #ifdef SILENTRADIANCE_ON
 /* Extern C tells the compiler this is C code instead of C++ code
