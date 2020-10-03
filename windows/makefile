@@ -1,12 +1,15 @@
-system: main.exe main_raylib.exe
+system: main_raylib.exe main.exe
 
 main.exe:	main.o 
 	 $(CC)  -g -O2 -Wl,-rpath -Wl,LIBDIR  -o main.exe  main.o  libglfw3.a libraylib_static.a  -L/usr/local/lib  \
 	  -L.  -lpthread -lm -DPLATFORM_DESKTOP -lglfw3  -lgdi32 -lwinmm -pthread
+	  
 main_raylib.exe:	main_raylib.o simple_curl_web_stream.o simple_decrypt.o \
-      simple_processor.o simple_seven_eight_decode.o simple_sound_raylib.o 
+      simple_processor.o simple_seven_eight_decode.o simple_sound_raylib.o \
+      simple_packet_summary.o 
 	 $(CC)  -g -O2 -Wl,-rpath -Wl,LIBDIR  -o main_raylib.exe  main_raylib.o \
 	  libraylib_static.a -L/usr/local/lib  simple_curl_web_stream.o simple_decrypt.o simple_processor.o \
+	    simple_packet_summary.o \
 	    simple_seven_eight_decode.o simple_sound_raylib.o -L. libraylib_static.a libopus.a libcurl.a libssl.a  libcrypto.a libz.a libglfw3.a \
 	    -lwsock32 -lcrypt32 -lws2_32 -lmingw32    -lpthread  -lgdi32 -lwinmm -lm -DPLATFORM_DESKTOP -pthread
 
@@ -36,3 +39,6 @@ simple_seven_eight_decode.o: ../simple_seven_eight_decode.c
 
 simple_sound_alsa.o: ../simple_sound_alsa.c
 	$(CC) -c  -g -O2 -I. -Wl,-rpath -Wl,LIBDIR  ../simple_sound_alsa.c
+
+simple_packet_summary.o: ../simple_packet_summary.c
+	$(CC) -c  -g -O2 -I. -Wl,-rpath -Wl,LIBDIR  ../simple_packet_summary.c

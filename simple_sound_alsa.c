@@ -26,6 +26,8 @@ to the default PCM device for 5 seconds of data.
 
 */
 
+    
+
 /* Use the newer ALSA API */
 #define ALSA_PCM_NEW_HW_PARAMS_API
 #include <stdio.h> /* for printf() and fprintf() */
@@ -38,10 +40,11 @@ to the default PCM device for 5 seconds of data.
 ^^^ for threadding example - doesnt help much just burns a cpu */
 
 #include "simple_processor.h"
-//#include "sound_generic.h"
 
 #include <alsa/asoundlib.h>
+#include "simple_processor.h"
 #include "simple_sound_alsa.h"
+#include "simple_compute_soundringnow.h"
 
 static volatile int wipe_sound=0;  // quick buffer clear
 
@@ -51,8 +54,10 @@ short * getNextQueue240() {
 
 if (wipe_sound) { // quick to help clear when changing the channel
   wipe_sound=0;
-  soundringhead = soundringtail;
-  soundringcurrent = -1;
+  soundringlast = soundringhead;
+  soundringtail = soundringhead;
+  soundringsend = -1;
+//  compute_soundringnow();
   }
   
 char status;
@@ -62,9 +67,9 @@ char status;
   
     if (soundringhead == soundringtail) { /* Empty zero it! */
         status='a';
-        soundringcurrent=-1;
+        soundringsend=-1;
     } else {
-        if (soundringcurrent==-1) {  /* was emptied. Check to see if we have enough */
+        if (soundringsend==-1) {  /* was emptied. Check to see if we have enough */
             /* Here we should wait until we got at least 4 or so */
             int queue_size;
             queue_size = soundringtail-soundringhead;
@@ -72,26 +77,31 @@ char status;
 	    
             if (queue_size>24) { /* ok, we have 24 consecutive ones. Go at it! */
                 soundringfirst=soundringhead;
-                soundringcurrent=soundringhead;
+                soundringsend=soundringhead;
+		
+		
 		status='2';
                 }
 	    }
         /* OK - here we may or may not be doing real sound.  so do one of the other */
-        if (soundringcurrent==-1) { /* still not good enough */
+        if (soundringsend==-1) { /* still not good enough */
             /* do nothing here - we are already set to zero_buffer */
         }
-        else if (soundringcurrent==soundringhead) { /* Good enough */
-            soundringcurrent = soundringhead;
-            nextBuffer = (short *)soundring[soundringcurrent];
+        else if (soundringsend==soundringhead) { /* Good enough */
+	    if (soundringfirst<0) soundringfirst=soundringhead;
+            soundringsend = soundringhead;
+            nextBuffer = (short *)soundring[soundringsend];
 	    status=' ';
             soundringhead = (soundringhead + 1) % SOUNDRING_COUNT;
-        } else { /* soundringcurrent is pointing ot the last frame. See if the frames are consecutive */
-            soundringcurrent = soundringhead;
-            nextBuffer = (short *)soundring[soundringcurrent];
+        } else { /* soundringsend is pointing ot the last frame. See if the frames are consecutive */
+	    if (soundringfirst<0) soundringfirst=soundringhead;
+            soundringsend = soundringhead;
+            nextBuffer = (short *)soundring[soundringsend];
             soundringhead = (soundringhead + 1) % SOUNDRING_COUNT;
             }
         }
-//    if (nextBuffer==zero_buffer) {fprintf(stderr,"%c",status);}
+    compute_soundringnow();
+    if (nextBuffer==zero_buffer) {fprintf(stderr,"%c",status);}
     return  nextBuffer;
 
 }
@@ -126,17 +136,20 @@ int init_receiver_sound(int block) {
   
   /* Open PCM device for playback. */
   if (!block) {
-    rc = snd_pcm_open(&handle, "default",1,
+#define WORLD_simple_sound_alsa_default "default"
+    rc = snd_pcm_open(&handle, WORLD_simple_sound_alsa_default,1,
                     SND_PCM_STREAM_PLAYBACK);
     }
   else {
-    rc = snd_pcm_open(&handle, "default",0,
+#define WORLD_simple_sound_alsa_default "default"
+    rc = snd_pcm_open(&handle, WORLD_simple_sound_alsa_default,0,
                     SND_PCM_STREAM_PLAYBACK);
     }
   
   if (rc < 0) {
     fprintf(stderr,
-            "unable to open pcm device: %s\n",
+#define WORLD_unable_to_open_pcm_device_colon___pct_s_lf_ "unable to open pcm device: %s\n"
+            WORLD_unable_to_open_pcm_device_colon___pct_s_lf_,
             snd_strerror(rc));
     exit(1);
   }
@@ -204,14 +217,16 @@ snd_pcm_uframes_t acsize;
 
 if (rc<0) 			      
     fprintf(stderr,
-            "unable to set hw parameters: %s\n",
+#define WORLD_unable_to_set_hw_parameters_colon___pct_s_lf_ "unable to set hw parameters: %s\n"
+            WORLD_unable_to_set_hw_parameters_colon___pct_s_lf_,
             snd_strerror(rc));
 
   /* Write the parameters to the driver */
   rc = snd_pcm_hw_params(handle, params);
   if (rc < 0) {
     fprintf(stderr,
-            "unable to set hw parameters: %s\n",
+#define WORLD_unable_to_set_hw_parameters_colon___pct_s_lf_ "unable to set hw parameters: %s\n"
+            WORLD_unable_to_set_hw_parameters_colon___pct_s_lf_,
             snd_strerror(rc));
     exit(1);
   }
@@ -274,8 +289,8 @@ exit(1);
 
 void finish_stream_sound() {
 wipe_sound=1;
-soundringhead = soundringtail-1;
-if (soundringhead<0) soundringhead +=SOUNDRING_COUNT;
+soundringhead = soundringtail; // was -1 everywhere
+//if (soundringhead<0) soundringhead +=SOUNDRING_COUNT;
 }
 
 
@@ -288,7 +303,8 @@ static int xrun_recovery(snd_pcm_t *handle, int err)
         if (err == -EPIPE) {    /* under-run */
                 err = snd_pcm_prepare(handle);
                 if (err < 0)
-                        printf("Can't recovery from underrun, prepare failed: %s\n", snd_strerror(err));
+#define WORLD_Can_qt_t_recovery_from_underrun_comma__prepare_failed_colon___pct_s_lf_ "Can't recovery from underrun, prepare failed: %s\n"
+                        printf(WORLD_Can_qt_t_recovery_from_underrun_comma__prepare_failed_colon___pct_s_lf_, snd_strerror(err));
                 return 0;
         } else if (err == -ESTRPIPE) {
                 while ((err = snd_pcm_resume(handle)) == -EAGAIN)
@@ -297,7 +313,8 @@ static int xrun_recovery(snd_pcm_t *handle, int err)
                 if (err < 0) {
                         err = snd_pcm_prepare(handle);
                         if (err < 0)
-                                printf("Can't recovery from suspend, prepare failed: %s\n", snd_strerror(err));
+#define WORLD_Can_qt_t_recovery_from_suspend_comma__prepare_failed_colon___pct_s_lf_ "Can't recovery from suspend, prepare failed: %s\n"
+                                printf(WORLD_Can_qt_t_recovery_from_suspend_comma__prepare_failed_colon___pct_s_lf_, snd_strerror(err));
                 }
                 return 0;
         }
@@ -333,7 +350,8 @@ if (rc<0) {
       }
   fprintf(stderr,"!");
   if (xrun_recovery(handle, rc) < 0) {
-                                        printf("Write error: %d %s size %d\n",rc, snd_strerror(rc),(soundBufferSize/4));
+#define WORLD_Write_error_colon___pct_d__pct_s_lf_ "Write error: %d %s\n"
+                                        printf(WORLD_Write_error_colon___pct_d__pct_s_lf_,rc, snd_strerror(rc));
                                         exit(EXIT_FAILURE);
                                 }
   goto rewriteit;

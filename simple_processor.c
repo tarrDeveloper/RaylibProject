@@ -44,10 +44,18 @@ static int frame=0;
 FILE *write_file_spec= NULL;
 
 volatile int soundringhead=0; /* start of the soundringqueue. normally incremented by sound.  But could overflow */
-volatile int soundringfirst=0; /* also incrmented by processor.c - probably the first viable sound in the ring */
+volatile int soundringfirst=-1; /* also incrmented by processor.c - probably the first viable sound in the ring */
+volatile int soundringlast=-1; /* also incrmented by processor.c - probably the first viable sound in the ring */
 volatile int soundringtail=0; /* the end on the sound ring. this is incremented by processor.c whenever a packet is added */
-volatile int soundringcurrent=-1; /* we are playing this RIGHT NOW: -1 if we are not playing.  This is updated by the sound subsystem */
+volatile int soundringsend=-1; /* we are sending this to the sound system  RIGHT NOW: -1 if we are not playing.  This is updated by the sound subsystem */
+volatile int soundringnow=-1; /* we are playing this RIGHT NOW: -1 if we are not playing.  This is updated by the sound subsystem */
 
+
+ 
+#define DEFAULT_FOR_THE_SOUND_DELAY 31
+  
+volatile int the_sound_delay=DEFAULT_FOR_THE_SOUND_DELAY; /* this can be set by defaults or something */
+    
 /*
 collections :  either char opus or short, depending on if the length is negative (opus) or positive (PCM). ordered by frame number. has gaps.
             collectioncommands - only filled on a few.
@@ -112,6 +120,54 @@ float minpcm=0.;
 float maxpcm=0.;
 
 
+void init_processor_buffers() {
+
+{
+  int i;
+  for (i=0;i<SOUNDRING_COUNT;i++) {
+      soundring[i]=soundring_area[i];
+      volatile struct processor_stat *stat;
+      stat =soundstat[i]=soundstat_area+i;
+      stat->len=0;
+      stat->frame=-1;
+      stat->version=0;
+
+      commandring[i]=commandring_area[i];   
+      collections[i]=(short *)collections_area[i];
+      collectioncommands[i]=(unsigned char *)collectioncommands_area[i];
+
+      //volatile struct processor_stat *stat;
+      stat = collectionstat[i]=collectionstat_area+i;
+      stat->len=0;
+      stat->frame=-1;
+      stat->version=0;
+
+      collectioncommandlen[i]=0;
+      command_frame[i]=-1;
+      }
+  collection_size=0;
+
+  }
+
+    soundringhead=0;
+    soundringtail=0;
+    soundringfirst=-1;
+    soundringlast=-1;
+    soundringsend=-1;
+    soundringnow=-1;
+    base_frame=-1;
+    collectionhead=0;
+    collectioncommandcount=0;
+      
+
+    frame = -1;
+}
+
+     
+
+
+
+
 void init_processor() {
 opusdecoder = NULL;
 frame = 0;
@@ -128,14 +184,7 @@ frame = 0;
 
     }
 
-/* init soundrings */
-int i;
-for (i=0;i<SOUNDRING_COUNT;i++) {
-  soundring[i] =soundring_area[i];
-  }
-soundringhead=0;
-soundringtail=0;
-soundringcurrent=-1;
+init_processor_buffers();
 return;
 }
 

@@ -22,14 +22,13 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 
 
-#ifndef PACKET_SAMPLE_H
-#define PACKET_SAMPLE_H 1
+#ifndef SIMPLE_PACKET_SAMPLE_H
+#define SIMPLE_PACKET_SAMPLE_H 1
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include "glue.h"
 
 #include <sys/time.h>
 

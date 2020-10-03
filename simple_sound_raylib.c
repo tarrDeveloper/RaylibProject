@@ -38,9 +38,9 @@ to the default PCM device for 5 seconds of data.
 ^^^ for threadding example - doesnt help much just burns a cpu */
 
 #include "simple_processor.h"
-//#include "sound_generic.h"
 
 #include "simple_sound_raylib.h"
+#include "simple_compute_soundringnow.h"
 
 #include "raylib.h"
 
@@ -52,8 +52,10 @@ short * getNextQueue240() {
 
 if (wipe_sound) { // quick to help clear when changing the channel
   wipe_sound=0;
-  soundringhead = soundringtail;
-  soundringcurrent = -1;
+  soundringlast = soundringhead;
+  soundringtail = soundringhead;
+  soundringsend = -1;
+//  compute_soundringnow();
   }
   
 char status;
@@ -63,9 +65,9 @@ char status;
   
     if (soundringhead == soundringtail) { /* Empty zero it! */
         status='a';
-        soundringcurrent=-1;
+        soundringsend=-1;
     } else {
-        if (soundringcurrent==-1) {  /* was emptied. Check to see if we have enough */
+        if (soundringsend==-1) {  /* was emptied. Check to see if we have enough */
             /* Here we should wait until we got at least 4 or so */
             int queue_size;
             queue_size = soundringtail-soundringhead;
@@ -73,26 +75,31 @@ char status;
 	    
             if (queue_size>24) { /* ok, we have 24 consecutive ones. Go at it! */
                 soundringfirst=soundringhead;
-                soundringcurrent=soundringhead;
+                soundringsend=soundringhead;
+		
+		
 		status='2';
                 }
 	    }
         /* OK - here we may or may not be doing real sound.  so do one of the other */
-        if (soundringcurrent==-1) { /* still not good enough */
+        if (soundringsend==-1) { /* still not good enough */
             /* do nothing here - we are already set to zero_buffer */
         }
-        else if (soundringcurrent==soundringhead) { /* Good enough */
-            soundringcurrent = soundringhead;
-            nextBuffer = (short *)soundring[soundringcurrent];
+        else if (soundringsend==soundringhead) { /* Good enough */
+	    if (soundringfirst<0) soundringfirst=soundringhead;
+            soundringsend = soundringhead;
+            nextBuffer = (short *)soundring[soundringsend];
 	    status=' ';
             soundringhead = (soundringhead + 1) % SOUNDRING_COUNT;
-        } else { /* soundringcurrent is pointing ot the last frame. See if the frames are consecutive */
-            soundringcurrent = soundringhead;
-            nextBuffer = (short *)soundring[soundringcurrent];
+        } else { /* soundringsend is pointing ot the last frame. See if the frames are consecutive */
+	    if (soundringfirst<0) soundringfirst=soundringhead;
+            soundringsend = soundringhead;
+            nextBuffer = (short *)soundring[soundringsend];
             soundringhead = (soundringhead + 1) % SOUNDRING_COUNT;
             }
         }
-//    if (nextBuffer==zero_buffer) {fprintf(stderr,"%c",status);}
+    compute_soundringnow();
+    if (nextBuffer==zero_buffer) {fprintf(stderr,"%c",status);}
     return  nextBuffer;
 
 }
@@ -136,7 +143,7 @@ int err;
 
   frames = 240;
 
-  size=96000;
+  size=96000*2; // fudged *2 maybe
   buffer = (char *) malloc(size);
   
 
@@ -173,7 +180,7 @@ exit(1);
 
 void finish_stream_sound() {
 wipe_sound=1;
-soundringhead = soundringtail-1;
+soundringhead = soundringtail; // was -1 everywhere
 if (soundringhead<0) soundringhead +=SOUNDRING_COUNT;
 }
 
@@ -189,19 +196,30 @@ int playOneSoundBuffer() {
 if (IsAudioStreamProcessed(stream)) {
   int i;
   int offset=0;
-  for (i=0;i<16;i++) {
+  for (i=0;i<17;i++) {
     char *soundBuffer;
+    if (soundringhead == soundringtail) { /* dont over do it */
+      break;
+      }
     int soundBufferSize = 960;
     soundBuffer = (char *)getNextQueue240();
     memcpy(buffer+offset,soundBuffer,soundBufferSize);
     offset += soundBufferSize;
     }
-  UpdateAudioStream(stream, buffer, offset/2);
+  if (offset) {
+    UpdateAudioStream(stream, buffer, offset/2);
+    }
+  else {
+            struct timespec thislong;
+             thislong.tv_sec = 0;
+             thislong.tv_nsec = 30000000; /* 3 milliseconds */
+             nanosleep(&thislong, &thislong);
+    }
   }
 else {
             struct timespec thislong;
              thislong.tv_sec = 0;
-             thislong.tv_nsec = 12000000; /* 12 milliseconds */
+             thislong.tv_nsec = 3000000; /* 3 milliseconds */
              nanosleep(&thislong, &thislong);
 
   }

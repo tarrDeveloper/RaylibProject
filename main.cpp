@@ -15,6 +15,7 @@ and function calls are done.  this is usually set in the makefile
 */
     extern "C" {
 #include "silentradiancesimple.h"
+#include "simple_packet_summary.h"
 #include <pthread.h>
 
         #ifndef logit
@@ -52,6 +53,7 @@ and function calls are done.  this is usually set in the makefile
         void InitSilentRadiance(char *url) {
             init_web_stream(url);
             init_processor();
+	    init_packet_summary();
             {
                 pthread_t tid[1];
                 int err;
@@ -326,12 +328,50 @@ int main(void)
     // Main game loop
     while (!WindowShouldClose())    // Detect window close button or ESC key
     {
+    #ifdef SILENTRADIANCE_ON
+			compute_packet_summary();
+    struct packet *p=NULL; /* pointer to packet */
+    Color this_background = RAYWHITE;
+    /* find current packet, if there is one recorded */
+    if (packet_summary.now_frame != -1) {
+      int index = (packet_summary.start_index + packet_summary.now_frame - packet_summary.start_frame) % PACKET_SUMMARY_SIZE;
+      if (index<0) index += PACKET_SUMMARY_SIZE;
+      p = packet_summary.packets+index;
+      if (p->has_statistics==0) p=NULL;
+      }
+    if (p) {
+
+       if (p->has_beat) { /* if there is a beat */
+         }
+       if (p->has_onset) { /* if there is a note onset */
+         }
+       /* pitch is p->pitch */
+       /* db is a rough db level - just 4 levels */
+       /* p->folded_flags is flags like beat, onset, but folded over a few packets to better match with the video frame rate */
+      } /* if we have good statistics on this packet */
+    if ((packet_summary.commanded_background_color[0] != 0.f)  ||
+        (packet_summary.commanded_background_color[1] != 0.f)  ||
+        (packet_summary.commanded_background_color[2] != 0.f)) { /* if the dj sets a color, use that as a background */
+      fprintf(stderr,"c");
+      this_background = (Color){(unsigned char)(packet_summary.commanded_background_color[0]*255.f),
+	                        (unsigned char)(packet_summary.commanded_background_color[0]*255.f),
+				(unsigned char)(packet_summary.commanded_background_color[0]*255.f),255};
+      }
+      
+    
+	   
+			
+    #endif
         // UPDATE
         gameManager.Update();
 
         // Draw
         BeginDrawing();
+#ifdef SILENTRADIANCE_ON
+        ClearBackground(this_background);
+#else
         ClearBackground(RAYWHITE);
+#endif	
         gameManager.Draw();
         EndDrawing();
     }

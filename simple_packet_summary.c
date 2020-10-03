@@ -18,23 +18,30 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
 
+/* differences from silentradiance:
+1. credit system "cred" is disabled.  would let you get credit for being tuned in to special events.
+2. International languages are disabled.
+3. Ip address to physical location is disabled.
+4. cant analyze local music 
+5. demos/movies cant be done with this - just live
+*/
 
 
 
 
-/* $Revision: 1.56 $ */
-
-#include "glue.h"
-
-#include "packet_summary.h"
+#include <stdio.h>
 #include <sys/time.h>
 #include <string.h>
 #include <stdlib.h>
 
 
-#include "processor.h"
-#include "analyzer.h"
-#include "credit_database.h"
+#include "silentradiancesimple.h"
+#include "simple_packet_summary.h"
+#include "simple_processor.h"
+
+#ifndef logit
+#define logit(...) {fprintf(stderr,__VA_ARGS__);fprintf(stderr,"\n");}
+#endif
 
 struct packet_summary packet_summary;
 
@@ -98,7 +105,7 @@ void init_packet(struct packet *packet) {
         packet->has_onset = 0;
         packet->snake_segment_around_here = 0;
         packet->more_length = 0;
-//#define WORLD_packet_summary_SR01 "SR01"
+#define WORLD_packet_summary_SR01 "SR01"
         strcpy(packet->version,WORLD_packet_summary_SR01);
 }
 
@@ -363,7 +370,10 @@ if ((length>2)&&(length<TITLE_TEXT_MAX-2)) {
 }  
   
   
-  
+unsigned short ip4_last16; /* would have each phone at a concert display different colors for different bits
+for wifi broadcast mode.  So the server could read the bits and give every user an x,y coordinate, so that we
+could light up all the phones and do like when they put up cards at baseball games to make an image. 
+Well, needs some hooks to work, and simple version doesnt handle wifi broadcast */
   
 /* Wxx  - xx is the bit of the ip address
 the color is read for 0, cyan for 1
@@ -445,45 +455,13 @@ else {
 
 
 
-
+/* on full version would learn the x and y coordinates of the phone in the world, so we could do work effects 
+i GUESS WE COULD DO A LATITUDE AND LONGITUDE, SO the DJ could give a shoutrout to a countey, and all phones in that country would light up
+But that could be done with a table faster.*/
 static char last_match[500];
 void R_cred_received(struct packet *packet,unsigned char *command,int length)
 {
-if (packet_summary.command_show_ip_address_stuff.show_mode) return;
-if (length<4) return;
-char command_mung[400];
-strcpy(command_mung,(char *)command);
-char *ptr=command_mung;
-char *sptr=command_mung;
-char *token[400];
-int i=0;
-while ((token[i]=strtok_r(sptr,"|",&ptr))!=NULL) {
-  sptr=NULL;
-  i++;
-  }
-if (i<5) return;
-if (token[4][0]=='\0') return;
-if ((strcmp(token[4],ip4_address)!=0)&&
-    (strcmp(token[4],ip6_address)!=0)) {
-    return;
-    }
-
-if (strcmp((char *)command,last_match)==0) {
-  logit("duplicate");
-  return;
-  }
-strcpy(last_match,(char *)command);
-
-logit("Match-------------------");
-logit("%s command",(char *)command);
-load_credit(token,i);
-// R|test|hib|2016-09-16 05:59:52|10.70.178.80|ef6d58fab58af978396b2a09bffaa7c9f3a8cd5951b87353277636448fd562e2
-strcpy(packet_summary.credit_event,token[1]);
-strncpy(packet_summary.credit_event_month,token[3],7);
-packet_summary.credit_event_month[7]='\0';
-strcpy(packet_summary.credit_dj,token[2]);
-
-packet_summary.credit_count = get_credit_count_from_database(packet_summary.credit_event,packet_summary.credit_event_month);
+return;
 }
 
 
@@ -537,7 +515,7 @@ float y=0.f;
 float z=0.f;
 match_string[0]=0;
 
-//#define WORLD__pct_c__pct_s__pct_f__pct_f__pct_f "%c %s %f %f %f"
+#define WORLD__pct_c__pct_s__pct_f__pct_f__pct_f "%c %s %f %f %f"
 sscanf((char *)command,WORLD__pct_c__pct_s__pct_f__pct_f__pct_f,&junk,match_string,&x,&y,&z);
 
 if (matches_our_ip_address(match_string)) {
@@ -1085,7 +1063,7 @@ int sr01_mode=1;
           packet->has_onset = 0;
           packet->snake_segment_around_here = 0;
           packet->more_length = 0;
-//#define WORLD_SR_PROTOCOL_SR00 "sr00"
+#define WORLD_SR_PROTOCOL_SR00 "sr00"
 	  strcpy(packet->version,WORLD_SR_PROTOCOL_SR00); // fake it 
 	  goto okgood;
 	  }
@@ -1320,7 +1298,6 @@ return result;
 }
 
 
-
 void compute_packet_summary() {
 int send=soundringsend;
 int now=soundringnow;
@@ -1341,27 +1318,6 @@ if(packet_summary_ignore_queue_size) {
 //logit("sound total_queue_size %d	collection size %d head %d tail %d current %d first %d\n",total_queue_size,
 //  collection_size,head,tail,current,first);
 
-
-if (analyzing) {
-  if ((head==tail)&&(first==tail)) {
-    send=-1;
-    }
-  else if (head==tail) {
-    send=head-1;
-    if (send<0) send += SOUNDRING_COUNT;
-    }
-  else {
-    send=head;
-    }
-    
-  if ((soundringfirst == soundringhead)&&(soundringfirst==soundringtail)) {
-    packet_summary.state=PACKET_STATE_NOTHING;
-    }
-  else {
-    packet_summary.state=PACKET_STATE_GOOD;
-    goto yeah;
-    }
-  }
   
 /* transition states */
 if (total_queue_size>24) {
@@ -1575,27 +1531,7 @@ if (packet_summary.warming_quality>1.) packet_summary.warming_quality=1.;
     }
   }
   
-/* compute quality */
-if (analyzing) {
-  packet_summary.quality=1.;
-  }
-else if ((packet_summary.now_frame != -1)&&(packet_summary.state!=PACKET_STATE_WARMING)) { 
-  int quality_count=0;
-  float tally=0.;
-  int startframe = packet_summary.now_frame;
-  if (startframe< packet_summary.no_gap_frame)  startframe=packet_summary.no_gap_frame;
-  int f;
-  for (f=startframe;f<=packet_summary.now_frame;f++) {
-    int index = (packet_summary.start_index + f - packet_summary.start_frame) % PACKET_SUMMARY_SIZE;
-    if (index<0) index += PACKET_SUMMARY_SIZE;
-    struct packet *packet = packet_summary.packets+index;  
-    if (packet->has_statistics) tally++;
-    quality_count++;
-    }
-  if (quality_count==0) packet_summary.quality=1.; else packet_summary.quality= tally/ ((float)quality_count);
-//  logit("c %d t %f q %f\n",quality_count,tally,packet_summary.quality);
-  }
-else {
+{ /* left over analyzing */
   packet_summary.quality=0.;
   }
 
@@ -1984,60 +1920,16 @@ return;
 
 /**/
 void output_visual_voice(FILE *des) {
-long old_frame;
-long the_frame;
-#ifdef SR_NOSOUND
- long sound_delay_frames=0;
-#endif
-int cframe = packet_summary.now_frame-sound_delay_frames;
-int old_cframe = song_frame_to_stream_frame.stream_frame;
-old_frame = song_frame_to_stream_frame.song_frame;
-the_frame = song_frame_from_stream_frame(cframe);
-//logit("	from %ld to %ld 	(%d to %d)\n",old_frame,the_frame,old_cframe,cframe);
-if (the_frame<0) return;
-if (old_frame<0) {old_frame = the_frame;}
-
-long first_old_frame = old_frame;
-
-if (the_frame - old_frame < 0) {
-  old_frame = the_frame;  }
-else if (the_frame - old_frame > 40) {
-  old_frame = the_frame;
-  }  
- 
-while(the_frame >= old_frame) {
-  setup_visual_voice_for_screen(first_old_frame,old_frame,visual_voice_output_for_real);
-  if (visual_voice_output_for_real) {
-    output_visual_voice2(des,old_frame);
-    }
-  old_frame++;
-  old_cframe++;
-  record_stream_frame(old_cframe);
-  }
 }
 
 
 
-extern int make_demo_mode;
 
 int sr_gettimeofday(struct timeval *tv, struct timezone *tz) {
-if (make_demo_mode) {
-  if (demo_time_of_day.tv_sec == -1) {
-    gettimeofday( ((struct timeval *)&demo_time_of_day),tz);
-    }
-  *tv = demo_time_of_day;
-  return 0;
-  }  
-else {
   return gettimeofday(tv,tz);
-  }  
 }
        
 extern void increase_demo_time(int microseconds) {
-if (make_demo_mode) {
-  demo_time_of_day = add_microseconds_to_time((
-    (struct timeval)demo_time_of_day),microseconds);
-  }
 }
 
 

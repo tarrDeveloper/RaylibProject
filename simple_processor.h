@@ -57,9 +57,12 @@ extern FILE *write_file_spec;
 extern volatile struct processor_stat *soundstat[SOUNDRING_COUNT];
 extern volatile struct processor_stat soundstat_area[SOUNDRING_COUNT];
 
-extern volatile int soundringfirst; /* first one on record - we can go back that far */
-extern volatile int soundringcurrent; /* we are playing this RIGHT NOW: -1 if we are not playing.  This i*/
+extern volatile int the_sound_delay; /* default 200 - number of frames that we delay sound to video syncing for */
 
+extern volatile int soundringfirst; /* first one on record - we can go back that far */
+extern volatile int soundringnow; /* we are playing this RIGHT NOW: -1 if we are not playing.  This i*/
+extern volatile int soundringsend; /* we are playing this RIGHT NOW: -1 if we are not playing.  This i*/
+extern volatile int soundringlast;
 extern volatile int soundringhead;
 extern volatile int soundringtail;
 extern volatile short *soundring[SOUNDRING_COUNT];
@@ -88,21 +91,8 @@ extern void init_processor(void);
 extern void init_processor_buffers(void); /*used by analyzer to init the processor command sound, and collection buffers, but without opus though */
 extern void shutdown_processor(void);
 
-typedef struct simple_silent_radiance {
-  OpusDecoder *opusdecoder;
-  volatile struct processor_stat soundstat_area[SOUNDRING_COUNT];
-  volatile int soundringfirst; /* first one on record - we can go back that far */
-  volatile int soundringcurrent; /* we are playing this RIGHT NOW: -1 if we are not playing.  This i*/
-
-  volatile int soundringhead;
-  volatile int soundringtail;
-  volatile short soundring_area[SOUNDRING_COUNT][960];
 
   #define NUMBER_OF_PACKETS_BEFORE_ACTIVATING_SOUND 80
-  float minpcm;
-  float maxpcm;
-
-  } simple_silent_radiance;
 
 
 
