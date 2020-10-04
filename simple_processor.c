@@ -28,7 +28,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 
 #include "simple_processor.h"
-
+#include <string.h>
 
 #ifndef PACKETMAXSIZE
 #define PACKETMAXSIZE 4000
@@ -57,38 +57,29 @@ volatile int soundringnow=-1; /* we are playing this RIGHT NOW: -1 if we are not
 volatile int the_sound_delay=DEFAULT_FOR_THE_SOUND_DELAY; /* this can be set by defaults or something */
     
 /*
-collections :  either char opus or short, depending on if the length is negative (opus) or positive (PCM). ordered by frame number. has gaps.
-            collectioncommands - only filled on a few.
 
 commands -> the commands active via frame
 
-collectioncommands - commands that were loaded for the packet but not yet assigned to their commandring/soundring.
 This is for SR01 and SR00.
-When the soundring is incremented, the commandring is swapped to point to a collection command, again saving us to copy.
 
 soundring - goes to sound.
 commandring - list of latest commands - useful for SR01, SR00 not so much
-commandring is congruent with soundring.   Where collectioncommands is loose.
+commandring is congruent with soundring.   
 
-	     Note - the buffers in collections are swapped with the buffers in soundring.   This is done as a quick way to change soundrings without having to copy memory - again.
-	                  
             -> sound
 */	    
 
 
-volatile short *soundring[SOUNDRING_COUNT];  /* points to soundring_area */
-volatile short soundring_area[SOUNDRING_COUNT][960];
+volatile short soundring[SOUNDRING_COUNT][960];  /* points to soundring_area */
 
 
 
 
   
   
-volatile struct processor_stat soundstat_area[SOUNDRING_COUNT];
-volatile struct processor_stat *soundstat[SOUNDRING_COUNT];
+volatile struct processor_stat soundstat[SOUNDRING_COUNT];
 
-volatile char *commandring[SOUNDRING_COUNT]; /* points to commandring_area */
-volatile char commandring_area[SOUNDRING_COUNT][2000]; /* commands for the sound ring */
+volatile char commandring[SOUNDRING_COUNT][4000]; /* points to commandring_area */
 volatile int commandlen[SOUNDRING_COUNT];
 
 
@@ -97,21 +88,15 @@ volatile int commandlen[SOUNDRING_COUNT];
 
 /* This handles the multi-packet stuff */
 int base_frame=-1;
-int collectionhead=0;
-short *collections[COLLECTION_COUNT]; /* points to colections_area */
-volatile short collections_area[COLLECTION_COUNT][960];
-
-volatile struct processor_stat collectionstat_area[COLLECTION_COUNT];
-volatile struct processor_stat *collectionstat[COLLECTION_COUNT];
 
 
-unsigned char *collectioncommands[COLLECTION_COUNT]; /* points to collectioncommands_area */
-volatile char collectioncommands_area[COLLECTION_COUNT][2000]; /* shared with commandring_area */
-int collectioncommandlen[COLLECTION_COUNT];
-int collectioncommandcount=0;
+
 int command_frame[COLLECTION_COUNT];/* -1 if unknown and need to be processed */
 
-int collection_size;
+
+
+
+
 
 
 
@@ -120,32 +105,47 @@ float minpcm=0.;
 float maxpcm=0.;
 
 
+
+
+void dump_full(int sampleSize,char *packet,int commandstart,int commandend) {
+  int j;
+  for (j=0;j<sampleSize;j++) {
+    fprintf(stderr," %4.4d",j);
+    if ((j%50)==49)
+           fprintf(stderr,"\\\n");
+    }
+  fprintf(stderr,"\n");
+  
+  for (j=0;j<sampleSize;j++) {
+    if (j==commandstart) {
+      fprintf(stderr,"<%3.3d ",packet[j]);
+      }
+    else if (j==commandend-1) {
+      fprintf(stderr," %3.3d>",packet[j]);
+      }
+    else {
+      fprintf(stderr," %3.3d ",packet[j]);
+      }
+    if ((j%50)==49)
+           fprintf(stderr,"\\\n");
+    }
+  fprintf(stderr,"\n");
+}
+
 void init_processor_buffers() {
 
 {
   int i;
   for (i=0;i<SOUNDRING_COUNT;i++) {
-      soundring[i]=soundring_area[i];
       volatile struct processor_stat *stat;
-      stat =soundstat[i]=soundstat_area+i;
+      stat =soundstat+i;
       stat->len=0;
       stat->frame=-1;
       stat->version=0;
 
-      commandring[i]=commandring_area[i];   
-      collections[i]=(short *)collections_area[i];
-      collectioncommands[i]=(unsigned char *)collectioncommands_area[i];
 
-      //volatile struct processor_stat *stat;
-      stat = collectionstat[i]=collectionstat_area+i;
-      stat->len=0;
-      stat->frame=-1;
-      stat->version=0;
-
-      collectioncommandlen[i]=0;
       command_frame[i]=-1;
       }
-  collection_size=0;
 
   }
 
@@ -156,8 +156,6 @@ void init_processor_buffers() {
     soundringsend=-1;
     soundringnow=-1;
     base_frame=-1;
-    collectionhead=0;
-    collectioncommandcount=0;
       
 
     frame = -1;
@@ -194,7 +192,7 @@ void shutdown_processor() {
 }
 
 
-int process_packet_main(int flag_override,int recvStringLen,unsigned char *packetbuffer) {
+int process_packet_main(int flag_override,int recvStringLen,unsigned char *packet) {
 
 int justwrite=0;
 short *soundBuffer;
@@ -219,12 +217,12 @@ if (sampleSize >PACKETMAXSIZE-2) {
 
 unsigned int flag=0;
 { /* compute flag */
-        int l = packetbuffer[0]+packetbuffer[1]*256+PER_FRAME_OVERHEAD;
+        int l = packet[0]+packet[1]*256+PER_FRAME_OVERHEAD;
 	if (l<=PER_FRAME_OVERHEAD) {
 	  logit("bad collection no first frame");
 	  return -2;
 	  }
-	if (l>=sampleSize) {
+	if (l>sampleSize) {
 	  logit("bad collection first length too big: %d",l);
 	  return -3;
 	  }
@@ -235,10 +233,10 @@ unsigned int flag=0;
 int framestart;
 int framesize;
 /* figure out how many opus packets are there. */
-if ((packetbuffer [0])||(packetbuffer[1]) ) {
+if ((packet [0])||(packet[1]) ) {
   framestart=2;
-  unsigned int pl1 = packetbuffer[0];
-  unsigned int pl2 = packetbuffer[1]; 
+  unsigned int pl1 = packet[0];
+  unsigned int pl2 = packet[1]; 
   pl2 = pl2 <<8;
 
   framesize= pl1+pl2;
@@ -247,9 +245,10 @@ else return (-5);
 
 int opus_result;
 float pcm[480];
-soundBuffer = (short *)soundring_area[soundringtail];
+int tail = soundringtail;
+soundBuffer = (short *)soundring[tail];
 soundBufferSize = 0;
-opus_result = opus_decode_float(opusdecoder,((unsigned char *)(packetbuffer))+2,
+opus_result = opus_decode_float(opusdecoder,((unsigned char *)(packet))+2,
                                             (opus_int32)(framesize),pcm,(int)240,(int)0);
   int i;
   if (opus_result != 240) {
@@ -262,12 +261,12 @@ opus_result = opus_decode_float(opusdecoder,((unsigned char *)(packetbuffer))+2,
     float ma;
     float m;
     ma=pcm[i];
-    m=ma*32768.;
+    m=ma*32767.;
     if (m>32767.) {
       s=32767;
       }
-    else if (m<-32768.) {
-      s=-32768;
+    else if (m<-32767.) {
+      s=-32767;
       }
     else {
       s=(int)m;
@@ -275,10 +274,125 @@ opus_result = opus_decode_float(opusdecoder,((unsigned char *)(packetbuffer))+2,
     soundBuffer[soundBufferSize++]=s;
     } /* for each sample * 2 channels */
 
-soundringtail= (soundringtail+1) % SOUNDRING_COUNT;
+if ((packet[sampleSize-1])=='1') { /* SR01 older transmission */
+    int l = sampleSize-20;
+    unsigned int i1=packet[l]&0xff;
+    unsigned int i2=packet[l+1]&0xff;
+    unsigned int i3=packet[l+2]&0xff;   
+    unsigned int i4=packet[l+3]&0xff;
+
+    frame = i1+(i2<<8)+(i3<<16)+(i4<<24);
+  }
+else   {/* SR00 */
+    int l = sampleSize-8;
+    unsigned int i1=packet[l]&0xff;
+    unsigned int i2=packet[l+1]&0xff;
+    unsigned int i3=packet[l+2]&0xff;   
+    unsigned int i4=packet[l+3]&0xff;
+
+    frame = i1+(i2<<8)+(i3<<16)+(i4<<24);
+  }
+
+memcpy((void *)(soundstat[tail].stats_area),
+        ((unsigned char *)(packet))+2+framesize,PER_FRAME_OVERHEAD);
+soundstat[tail].frame = frame;
+soundstat[tail].len = 480;
+memcpy((void *)(&soundstat[tail].version),(void *)(packet+sampleSize-4),4*sizeof(char));
+
+
+/* find the command start end end */
+int commandend;
+int commandstart;
+
+if ((packet[sampleSize-1])=='1') { /* SR01 older transmission */
+  commandend=sampleSize; /* 40 bytes overhead */
+  }
+else { // sr00 older transmission
+  commandend =sampleSize; /* 20 bytes overhead */
+  }
+
+
+
+int look;
+look=0;
+/* figure out how many opus packets are there. */
+int opus_frames = 0;
+while ( ( (packet [look])||(packet[look+1]) )&&(opus_frames<12)&&(look<sampleSize)) {
+            /* found a frame. */   
+            unsigned int pl1 = packet[look];  
+            unsigned int pl2 = packet[look+1];
+            pl2 = pl2 <<8;
+ 
+            int framesize= pl1+pl2;
+//          fprintf(stderr,"framestart %d opus_frames %d framesize[opus_frames] %d\n",
+//              framestart[opus_frames],opus_frames,framesize[opus_frames]);
+            // if framesize is too big, we will skip this frame
+            if ( framesize +look+2+PER_FRAME_OVERHEAD >sampleSize) {
+	      commandlen[tail] = 0;
+              goto ohwell;
+              }
+            
+
+            look=look+2+framesize+PER_FRAME_OVERHEAD;
+            opus_frames++;
+            
+
+            }
+// we ignore multi-frame packets in simple - but need to find the command start anyways.
+
+commandstart = look+2;
+
+/* place the last chunk into collectioncommands - collectioncommandcount - is a modulo counter */
+commandlen[tail]=commandend-commandstart;
+if (commandlen[tail]<0) {
+  commandlen[tail] = 0;
+  goto ohwell;
+  }
+memcpy(commandring[tail],(packet+commandstart),commandlen[tail]);
+if ((packet[sampleSize-1])!='0') { /* SR01 older transmission */
+  fprintf(stderr,"aha bad 08\n");
+  dump_full(sampleSize,packet,commandstart,commandend);
+  }
+
+#ifdef safhdjkasdfhjfasdkasdjkf
+if ((commandlen[tail])&&(commandlen[tail]!=12)) {
+  fprintf(stderr,"bad - packet %lx commandstart %d commandend %d samplesize %d\n",(long)packet,commandstart,commandend,sampleSize);
+  int j;
+  for (j=0;j<sampleSize;j++) {
+    fprintf(stderr," %4.4d",j);
+    }
+  fprintf(stderr,"\n");
+  
+  for (j=0;j<sampleSize;j++) {
+    if (j==commandstart) {
+      fprintf(stderr,"<%3.3d ",packet[j]);
+      }
+    else if (j==commandend-1) {
+      fprintf(stderr," %3.3d>",packet[j]);
+      }
+    else {
+      fprintf(stderr," %3.3d ",packet[j]);
+      }
+    }
+  fprintf(stderr,"\n");
+      
+    
+  } 
+#endif
+ohwell:
+
+command_frame[tail]=frame;
+
+
+soundringtail= (tail+1) % SOUNDRING_COUNT;
 if (soundringhead==soundringtail) {
   soundringhead = (soundringhead+1) % SOUNDRING_COUNT;
   }
+
+
+
+
+
 return 0;
 } /* process_packet_main */
 
@@ -289,14 +403,14 @@ return 0;
 
 
 
-void process_packet_ignore_framestart(int recvStringLen, unsigned char *packetbuffer)
+void process_packet_ignore_framestart(int recvStringLen, unsigned char *packet)
 {
-int t=process_packet_main(4,recvStringLen,packetbuffer);
+int t=process_packet_main(4,recvStringLen,packet);
 if (t) fprintf(stderr,"e%d.",t);
 }
 
-void process_packet(int recvStringLen, unsigned char *packetbuffer) 
+void process_packet(int recvStringLen, unsigned char *packet) 
 {
-int t=process_packet_main(0,recvStringLen,packetbuffer);
+int t=process_packet_main(0,recvStringLen,packet);
 if (t) fprintf(stderr,"e%d.",t);
 }

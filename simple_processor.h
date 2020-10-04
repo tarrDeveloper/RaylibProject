@@ -36,6 +36,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #define SOUNDRING_COUNT 400
 #define COLLECTION_COUNT 400
+/* both have to be the same ^^^ */
 
 #ifndef PER_FRAME_OVERHEAD
 #define PER_FRAME_OVERHEAD 16
@@ -54,8 +55,7 @@ typedef struct processor_stat {
 extern OpusDecoder *opusdecoder;
 extern FILE *write_file_spec;
 
-extern volatile struct processor_stat *soundstat[SOUNDRING_COUNT];
-extern volatile struct processor_stat soundstat_area[SOUNDRING_COUNT];
+extern volatile struct processor_stat soundstat[SOUNDRING_COUNT];
 
 extern volatile int the_sound_delay; /* default 200 - number of frames that we delay sound to video syncing for */
 
@@ -65,11 +65,9 @@ extern volatile int soundringsend; /* we are playing this RIGHT NOW: -1 if we ar
 extern volatile int soundringlast;
 extern volatile int soundringhead;
 extern volatile int soundringtail;
-extern volatile short *soundring[SOUNDRING_COUNT];
-extern volatile short *soundring[SOUNDRING_COUNT];  /* points to soundring_area */
+extern volatile short soundring[SOUNDRING_COUNT][960];
 
-extern volatile char *commandring[SOUNDRING_COUNT];
-extern volatile char commandring_area[SOUNDRING_COUNT][2000]; /* commands for the sound ring */
+extern volatile char commandring[SOUNDRING_COUNT][4000];
 extern volatile int commandlen[SOUNDRING_COUNT];
 
 

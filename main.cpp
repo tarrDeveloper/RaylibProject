@@ -352,12 +352,14 @@ int main(void)
     if ((packet_summary.commanded_background_color[0] != 0.f)  ||
         (packet_summary.commanded_background_color[1] != 0.f)  ||
         (packet_summary.commanded_background_color[2] != 0.f)) { /* if the dj sets a color, use that as a background */
-      fprintf(stderr,"c");
-      this_background = (Color){(unsigned char)(packet_summary.commanded_background_color[0]*255.f),
-	                        (unsigned char)(packet_summary.commanded_background_color[0]*255.f),
-				(unsigned char)(packet_summary.commanded_background_color[0]*255.f),255};
-      }
       
+      this_background = (Color){(unsigned char)(packet_summary.commanded_background_color[0]*255.f),
+	                        (unsigned char)(packet_summary.commanded_background_color[1]*255.f),
+				(unsigned char)(packet_summary.commanded_background_color[2]*255.f),255};
+      }
+    else {
+      this_background = RAYWHITE;
+      }    
     
 	   
 			

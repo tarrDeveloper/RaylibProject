@@ -59,7 +59,7 @@ struct packet {
     int has_beat;
     int has_onset;
     int snake_segment_around_here;
-    unsigned char *more[COMMAND_PACKET_MAX_SIZE];
+    unsigned char more[COMMAND_PACKET_MAX_SIZE];
     int more_length; /* zero if no more extra data */
     short sample[480]; /* left right */
     char version[5]; /* always SR01 for now */

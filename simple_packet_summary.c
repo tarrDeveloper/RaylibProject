@@ -24,6 +24,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 3. Ip address to physical location is disabled.
 4. cant analyze local music 
 5. demos/movies cant be done with this - just live
+6. command len is compensated for sr01,sr00 end overhead before - where in main code it is done here. -12/-28 something liek that
+7. Therea are no area sections - so soundstat is no longer a pointer to a soundstat, it is an array
 */
 
 
@@ -77,6 +79,7 @@ int i4 = l[3] & 0xff;
 return i1 + (i2 << 8) + (i3 << 16) + (i4 << 24);
 }
 
+extern void dump_full(int sampleSize,char *packet,int commandstart,int commandend);
 
 
 int float_from_command(unsigned char *l) {
@@ -988,7 +991,18 @@ while (i<packet->more_length) {
   int sublength = more[i++];
   if (sublength+i >packet->more_length) {
     /* illegal packer for length - could be additional data I dont know*/
-    logit("c %d (%c) + i of %d = %d compared to  m %d",sublength,sublength,i,sublength + i,packet->more_length);
+    logit("%d of %d = %d compared to  m %d",sublength,i,sublength+i,packet->more_length);
+    {
+      int j;
+      for (j=0;j<packet->more_length;j++)  {
+        fprintf(stderr," %3.3d ",j);
+	}
+      fprintf(stderr,"\n");
+      for (j=0;j<packet->more_length;j++)  {
+        fprintf(stderr," %3.3d ",more[j]);
+	}
+      fprintf(stderr,"\n");
+      }
     logit("nope .");
     break;
     }
@@ -1027,8 +1041,12 @@ unsigned char *e = NULL;
 if (current != -1) {
   command = (unsigned char *)commandring[current];
   commandSize=commandlen[current];
+  if (commandSize==0) {
+    goto no_version;
+    }  
+  
   e = command+commandSize;
-  packet->frame_number = soundstat[current]->frame; // redundant - done before the call to collect_a_packet.
+  packet->frame_number = soundstat[current].frame; // redundant - done before the call to collect_a_packet.
 //  record_stream_frame(packet->frame_number);      /* goofed up visual. movement by going forward all the time */
   }
 else {
@@ -1036,17 +1054,19 @@ else {
   return;
   }
 
+packet->more_length = 0;
 int sr01_mode=1;
 {
  char *x;
- x = (char *)(&(soundstat[current]->version));
+ x = (char *)(&(soundstat[current].version));
  if (x[3]=='1') {
    sr01_mode = 1;
    }
  else if (x[3]=='0') {
    sr01_mode = 0;
    }
- else if (soundstat[current]->version==0) {
+ else if (soundstat[current].version==0) {
+   no_version:
 //          logit("Current %d index %d 0  version",current,current_index);
           /* analysis is not yet complete. */
           packet->header_frame_number = -1; /* find this also */
@@ -1069,13 +1089,15 @@ int sr01_mode=1;
 	  }
  else {
    logit("packet summary invalid packet version %c%c%c%c",x[0],x[1],x[2],x[3]);
+      dump_full(packet->more_length+12,packet->more,packet->more_length,packet->more_length+12) ;
+   
    }
  memcpy(packet->version,x,4*sizeof(char));
  packet->version[4]='\0';
  }
  
 if (sr01_mode) {
-    if (commandSize<36) {
+    if (commandSize<40) {
         packet->header_frame_number = -1; /* find this also */
         packet->has_statistics = 0;
         packet->has_some_flags = 0; /* do forward analysis to see if some flags came through */
@@ -1126,9 +1148,10 @@ else { /* SR00 mode */
 
           packet->has_some_flags = 1; /* do forward analysis to see if some flags came through */
           /* has_music_samples done later */
-          unsigned char *f=((unsigned char *)(soundstat[current]->stats_area))+PER_FRAME_OVERHEAD;
+          unsigned char *f=((unsigned char *)(soundstat[current].stats_area))+PER_FRAME_OVERHEAD;
 	  packet->pitch=float_from_command(f-16);
-	  //logit("p %f\n",packet->pitch);
+	  
+//	  logit("p %f\n",packet->pitch);
           packet->microseconds=int_from_command(f-12);
           packet->db_level=float_from_command(f-8);
 	  packet->db_level_int = packet->db_level*1000.;
@@ -1141,16 +1164,35 @@ else { /* SR00 mode */
           packet->has_beat = packet->folded_flags&2;
           packet->has_onset = packet->folded_flags&1;
           packet->snake_segment_around_here = packet->folded_flags&4;
-          
-	  packet->more_length=commandSize-12;
-	  if (packet->more_length>0) {
-            if (packet->more_length>COMMAND_PACKET_MAX_SIZE-1) packet->more_length=COMMAND_PACKET_MAX_SIZE-1;
-            memcpy(packet->more,command,packet->more_length);
+	  if (commandSize) {         
+         	  packet->more_length=commandSize-12;
+		  }
+          else {
+	    packet->more_length=0;
 	    }
-	
-	  process_commands_for_summary(packet);
-	  } /* SR00 has a command */
-        } /* SR00  mode*/
+ 	  }
+  if (packet->more_length>0) {
+    if (packet->more_length>COMMAND_PACKET_MAX_SIZE-1) packet->more_length=COMMAND_PACKET_MAX_SIZE-1;
+      memcpy(packet->more,command,packet->more_length);
+//      fprintf(stderr,"sr00 %d (%d) %c\n",packet->more_length,packet->more[1],packet->more[1]);
+//    if (packet->more[0]==0) 
+//      dump_full(packet->more_length+12,packet->more,packet->more_length,packet->more_length+12) ;
+#ifdef judsfndfsjs	  
+    {
+      int j;
+      for (j=0;j<packet->more_length;j++)  {
+        fprintf(stderr," %3.3d ",j);
+	}
+      fprintf(stderr,"\n");
+      for (j=0;j<packet->more_length;j++)  {
+        fprintf(stderr," %3.3d ",packet->more[j]);
+	}
+      fprintf(stderr,"\n");
+      }
+#endif      
+   } /* SR00 has a command */
+        	  process_commands_for_summary(packet);
+} /* SR00  mode*/
 
 
 
@@ -1315,21 +1357,19 @@ if(packet_summary_ignore_queue_size) {
   packet_summary.state=PACKET_STATE_GOOD;
   goto yeah;
   }    
-//logit("sound total_queue_size %d	collection size %d head %d tail %d current %d first %d\n",total_queue_size,
-//  collection_size,head,tail,current,first);
 
   
 /* transition states */
 if (total_queue_size>24) {
-  int previous_frame=soundstat[soundringhead]->frame-1;
+  int previous_frame=soundstat[soundringhead].frame-1;
   int i;
   total_queue_size=0;
   for (i=soundringhead;i!=soundringtail;i = (i+1)%SOUNDRING_COUNT) {
-    if ((previous_frame+1)!=soundstat[i]->frame) { /* the frames are not sequential in the buffer */
+    if ((previous_frame+1)!=soundstat[i].frame) { /* the frames are not sequential in the buffer */
       break;
       }
     total_queue_size++;
-    previous_frame = soundstat[i]->frame;
+    previous_frame = soundstat[i].frame;
     }
   }
 if (total_queue_size>=40) {
@@ -1337,9 +1377,6 @@ if (total_queue_size>=40) {
   }
 else if (total_queue_size) {
   packet_summary.state=PACKET_STATE_WARNING;
-  }
-else if (collection_size) {
-  packet_summary.state=PACKET_STATE_WARMING;
   }
 else {
   /* set the start of nothing state if we are starting the nothing state */
@@ -1375,21 +1412,21 @@ if (packet_summary.state==PACKET_STATE_WARMING) {
   packet_summary.soundringtail=-1;
   packet_summary.soundringfirst=-1;
   packet_summary.soundringhead=-1;
-  packet_summary.warming_quality= ((float)(collection_size))/((float)(NUMBER_OF_PACKETS_BEFORE_ACTIVATING_SOUND));
+  packet_summary.warming_quality= 0.f; // simple does not show that
   goto final;
   }
 
 
 if (packet_summary.start_frame==-1) {
   if (first != -1) {
-    packet_summary.start_frame=soundstat[first]->frame;
-    packet_summary.end_frame = soundstat[first]->frame;
+    packet_summary.start_frame=soundstat[first].frame;
+    packet_summary.end_frame = soundstat[first].frame;
     }
   }
 
 if ((send != -1)&&(now != -1)) {
-  packet_summary.send_frame = soundstat[send]->frame;
-  packet_summary.now_frame = soundstat[now]->frame;
+  packet_summary.send_frame = soundstat[send].frame;
+  packet_summary.now_frame = soundstat[now].frame;
   }
     else {
         packet_summary.send_frame=-1;
@@ -1397,7 +1434,7 @@ if ((send != -1)&&(now != -1)) {
 	}
     
 if (packet_summary.send_frame<=0) {
-  packet_summary.send_frame = soundstat[soundringhead]->frame;
+  packet_summary.send_frame = soundstat[soundringhead].frame;
   }
 
 if (first==-1) {
@@ -1409,13 +1446,13 @@ if (first==-1) {
   packet_summary.soundringtail=-1;
   packet_summary.soundringfirst=-1;
   packet_summary.soundringhead=-1;
-  packet_summary.warming_quality= ((float)(collection_size))/((float)(NUMBER_OF_PACKETS_BEFORE_ACTIVATING_SOUND));
+  packet_summary.warming_quality=  0.f; // simple does not show that
   goto final;
   }
 /* go back */
 {
-  int f=soundstat[first]->frame;
-//  logit("  f is soundstat[%d]->frame = %d",first,f);
+  int f=soundstat[first].frame;
+//  logit("  f is soundstat[%d].frame = %d",first,f);
   if ((packet_summary.start_frame==-1)||(packet_summary.start_frame-f>PACKET_SUMMARY_SIZE)||
     (f-packet_summary.start_frame>PACKET_SUMMARY_SIZE*2)||
     (packet_summary.start_frame-packet_summary.send_frame>PACKET_SUMMARY_SIZE)||
@@ -1471,7 +1508,7 @@ int maxframe=-1;
 {
   int i;
   for (i=soundringfirst;i!=soundringtail;i = (i+1)%SOUNDRING_COUNT) {
-    int f = soundstat[i]->frame;
+    int f = soundstat[i].frame;
     if (f>maxframe) maxframe=f;
     int index = (packet_summary.start_index + f - packet_summary.start_frame) % PACKET_SUMMARY_SIZE;
     if (index<0) index += PACKET_SUMMARY_SIZE;
@@ -1929,8 +1966,6 @@ int sr_gettimeofday(struct timeval *tv, struct timezone *tz) {
   return gettimeofday(tv,tz);
 }
        
-extern void increase_demo_time(int microseconds) {
-}
 
 
 /* 

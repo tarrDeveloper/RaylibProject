@@ -1,0 +1,98 @@
+This is for the stream:
+
+LEN hi LEN lo encrypted gobblydy gook ........   sr00
+
+Or
+
+LEN hi LEN lo encrypted gobblydy gook ........   sr01
+
+Yes, there are 2 different formats.
+
+
+where LEN hi and LEN lo is the length of the data packet uncluding the last 4 packets.
+
+Encrypyerd gobldygook is to handled DMCA Section 103 (17 U.S.C Sec 1201(1)(1)
+‚No person shall circumvent a technological measure that effectively controls access to a work protected under this title.‚
+
+So it is encrypted to make sure no one - including prosecuters shall not circumvent, it,
+and if they do, oops , they broke the law. :)
+
+The encryption is an XOR of various sections of a table with the data.
+
+
+After decription:
+
+LEN hi LEN lo  data_chunk_sr00 (4)frame_number (4) header_frame_number sr00
+Because sr00 had multiple frames (in wifi broadcast) we keep track of both the first frame and the current last 
+frame in 32 bits.
+
+data_chunk will be decribed later.
+
+-or
+
+LEN hi LEN lo  data_chunk_sr01 (12)Checksums (4) frame_number (4-float) pitch (4) header_frane_number (4) microseconds \
+(4) db_level_int (4) flags  'sr01'
+
+the finishing stuff is 12 + 28 overhead.
+
+
+pitch is a float chunked into 4 bytes.
+db_level_int is -11000 if its quiet.  It is the db_level ( a float) * 1000
+
+flags have beat points and note onset points.
+
+
+
+data_chunk_sr00  - this used to put up to 12 data frames for broadcast mode, that was because wifi is lossy so we redundantly resent 
+the packets, but for streaming it is just one packet.
+After the packlet is done, a 00 00 lenght is indicated and the commands are listed.
+Commands allow the server to suggest controlls to the client.
+
+Format is (2) len (len+16) data_packet_sr00  [(2) len (len+16) data_packet_sr00   -- over and over ]  (2) 0 (command_section variable length)   
+How long is the command section - long enough to fit to the end of the packet.
+
+
+
+
+
+
+
+Data packet is:
+
+(2)length (length+16) opusdata|stats   [(2) 0 length)
+
+So opusdata is the compressed music from the opus encoder.
+Stats is :
+
+
+
+stats format is:
+(4f) pitch (4) microseconds (4f) db_level (4) flags.
+
+pitch - floating point pitch
+microseconds - microseconds modulo 1024 seconds
+db level - float
+
+flags bits -
+note onset - 1
+beat  -      2
+2 out of 3 - 4
+
+
+
+data_chunk_sr01 - this also can put up to 12 frames and generic commands in a packet in broadcast mode, but streaming has only one frame per packet.
+Format is (2) len (len+16) data_packet_sr00  [(2) len (len+16) data_packet_sr00   -- over and over ]  (2) 0 (command_section variable length)
+How long is the command section - long enough to fit to the end of the packet.
+
+
+
+
+Note - there is a kludge where the transmitter only sends 2 out of 3 packets for wifi broadcasting. this makes it (almost) fit 
+into the 1Mb/s standard broadcasting rate.  But it is much better with a wifi card
+that can be forced into higher speeds for broadcasting - broadcom made some of these 15 years ago, mainly in AMD chipset laptops.
+This uses the (4) bit to help a flake.  But this is commented out. 
+
+
+
+
+the max size of a transmit packet is ~1480 bytes

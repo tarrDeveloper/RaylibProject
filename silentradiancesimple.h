@@ -227,7 +227,7 @@ extern volatile int soundringcurrent; /* we are playing this RIGHT NOW: -1 if we
 
 extern volatile int soundringhead;
 extern volatile int soundringtail;
-extern volatile short *soundring[SOUNDRING_COUNT];  /* points to soundring_area */
+extern volatile short soundring[SOUNDRING_COUNT][960];  /* points to soundring_area */
 
 
 #define NUMBER_OF_PACKETS_BEFORE_ACTIVATING_SOUND 80
