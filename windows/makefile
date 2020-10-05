@@ -45,7 +45,7 @@ main_raylib.exe:	main_raylib.o simple_curl_web_stream.o simple_decrypt.o \
 	 $(CC)  -g -O2 -Wl,-rpath -Wl,LIBDIR  -o main_raylib.exe  main_raylib.o \
 	  libraylib_static.a -L/usr/local/lib  simple_curl_web_stream.o simple_decrypt.o simple_processor.o \
 	    simple_packet_summary.o \
-	    simple_seven_eight_decode.o simple_sound_raylib.o -L. libraylib_static.a libopus.a libcurl.a libssl.a  libcrypto.a libz.a libglfw3.a \
+	    simple_seven_eight_decode.o simple_sound_raylib.o -L. libraylib_static.a libopus.a libcurl.a libssl.a  libcrypto.a libz.a libglfw3.a libwinpthread.a \
 	    -lwsock32 -lcrypt32 -lws2_32 -lmingw32    -lpthread  -lgdi32 -lwinmm -lm -DPLATFORM_DESKTOP -pthread
 
 main_alsa.o:	../main.cpp
