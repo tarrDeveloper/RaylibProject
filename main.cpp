@@ -4,19 +4,19 @@ extern "C" {
 #include <math.h>   
 }
 
-//#define SILENTRADIANCE_ON
+#define SILENTRADIANCE_OFF
 
 
 // SILENTRADIANCE
 #ifdef SILENTRADIANCE_ON
-/* Extern C tells the compiler this is C code instead of C++ code
-There are minor differences on how parameters are handled
-and function calls are done.  this is usually set in the makefile
-*/
+    /* Extern C tells the compiler this is C code instead of C++ code
+    There are minor differences on how parameters are handled
+    and function calls are done.  this is usually set in the makefile
+    */
     extern "C" {
-#include "silentradiancesimple.h"
-#include "simple_packet_summary.h"
-#include <pthread.h>
+        #include "silentradiancesimple.h"
+        #include "simple_packet_summary.h"
+        #include <pthread.h>
 
         #ifndef logit
             #define logit(...) {fprintf(stderr,__VA_ARGS__);fprintf(stderr,"\n");}
@@ -53,7 +53,6 @@ and function calls are done.  this is usually set in the makefile
         void InitSilentRadiance(char *url) {
             init_web_stream(url);
             init_processor();
-	    init_packet_summary();
             {
                 pthread_t tid[1];
                 int err;
@@ -103,8 +102,12 @@ class GameManager
         {
             public:
                 // timer for spawning entities
-                int spawnTimerMax = 60;
+                int initialSpawnTime = 30;
+                float spawnTimerMax = initialSpawnTime;
                 int spawnTimer = spawnTimerMax;
+                
+                // data for asteroid spawn
+                int spawn = 0;
                 
                 // playerShip
                 class PlayerShip
@@ -123,6 +126,9 @@ class GameManager
                         
                         // handles the column "flash effect"
                         int columnAlpha = 0;
+                        
+                        // stores the radius of the player
+                        int radius = 32;
                     
                         // UPDATE
                         void Update()
@@ -152,7 +158,7 @@ class GameManager
                         void Draw()
                         {
                             DrawRectangle(this->xto-90,-32,180,992,(Color){255,255,255,this->columnAlpha});
-                            DrawCircle(this->x,this->y,32,DARKBLUE);
+                            DrawCircle(this->x,this->y,this->radius,DARKBLUE);
                         }
                         // RESET
                         void Reset()
@@ -162,7 +168,7 @@ class GameManager
                             this->x = this->xto;
                         }
                 } playerShip;
-                
+     
                 // AsteroidHandler
                 class AsteroidHandler
                 {
@@ -178,17 +184,20 @@ class GameManager
                                 // UPDATE
                                 void Update()
                                 {
-                                    this->y+=8;
+                                    this->y+=16;
                                 }
                                 // DRAW
                                 void Draw()
                                 {
-                                    DrawCircle(this->x,this->y,64,BROWN);
+                                    DrawCircle(this->x,this->y,48,BROWN);
                                 }
                         } asteroid [20];
                         
                         // stores the current number of asteroids
                         int count = 0;
+                        
+                        // stores the asteoid radius
+                        int radius = 48;
                         
                         // CREATE
                         void Create(int X, int Y)
@@ -223,6 +232,11 @@ class GameManager
                             for(int i=0;i<this->count;i++)
                             {
                                 this->asteroid[i].Update();
+                                if (this->asteroid[i].y > 960+32)
+                                {
+                                    Destroy(i);
+                                    i--;
+                                }
                             }
                         }
                         // DRAW
@@ -240,13 +254,14 @@ class GameManager
                 {
                     this->playerShip.Reset();
                     this->asteroidHandler.Reset();
+                    this->spawnTimerMax = this->initialSpawnTime;
+                    this->spawnTimer = this->spawnTimerMax;
                 }
-                
+      
                 // SCENE INIT
                 GameplayScene()
                 {
-                    this->asteroidHandler.Create(50,0);
-                    this->asteroidHandler.Create(30,0);
+                    
                 }
                 // SCENE UPDATE
                 void Update()
@@ -256,32 +271,43 @@ class GameManager
                     this->asteroidHandler.Update();
                     
                     // Spawning new asteroids
-                    if (spawnTimer > 0)
+                    if (this->spawnTimer > 0)
                     {
-                        spawnTimer--;
+                        this->spawnTimer--;
                     }
                     else
                     {
-                        if (GetRandomValue(0,1) == 0) {
-                            asteroidHandler.Create(180,-32);
+                        // changing the ile if chance is greater
+                        if (this->spawn == 0)
+                        {
+                            this->spawn = 1;
                         }
-                        if (GetRandomValue(0,1) == 0) {
-                            asteroidHandler.Create(270,-32);
+                        else if (this->spawn == 1)
+                        {
+                            this->spawn = 2*GetRandomValue(0,1);
                         }
-                        if (GetRandomValue(0,1) == 0) {
-                            asteroidHandler.Create(360,-32);
+                        else if (this->spawn == 2)
+                        {
+                            this->spawn = 1;
                         }
-                        spawnTimer = spawnTimerMax;
+                        
+                        // setting previous to off
+                        if (this->spawn != 0) {asteroidHandler.Create(90,-32); }
+                        if (this->spawn != 1) {asteroidHandler.Create(270,-32); }
+                        if (this->spawn != 2) {asteroidHandler.Create(450,-32); }
+
+                        this->spawnTimer = this->spawnTimerMax;
+                        this->spawnTimerMax-=0.5;
                     }
                     
                     // Checking for collisions
-                    //for(int i=0;i<asteroidHandler.count;i++)
-                    //{
-                    //    if (collision.CircleCircle(playerShip.x,playerShip.y,32,asteroidHandler.asteroid[i].x,asteroidHandler.asteroid[i].y,16))
-                    //    {
-                    //        Reset();
-                    //    }
-                    //}
+                    for(int i=0;i<asteroidHandler.count;i++)
+                    {
+                        if (collision.CircleCircle(playerShip.x,playerShip.y,playerShip.radius,asteroidHandler.asteroid[i].x,asteroidHandler.asteroid[i].y,asteroidHandler.radius))
+                        {
+                            Reset();
+                        }
+                    }
                 }
                 // SCENE DRAW
                 void Draw()
@@ -289,8 +315,7 @@ class GameManager
                     this->playerShip.Draw();
                     this->asteroidHandler.Draw();
                 }
-        } gameplayScene;
-        
+        } gameplayScene;    
         // GAME UPDATE
         void Update()
         {
@@ -328,52 +353,61 @@ int main(void)
     // Main game loop
     while (!WindowShouldClose())    // Detect window close button or ESC key
     {
-    #ifdef SILENTRADIANCE_ON
-			compute_packet_summary();
-    struct packet *p=NULL; /* pointer to packet */
-    Color this_background = RAYWHITE;
-    /* find current packet, if there is one recorded */
-    if (packet_summary.now_frame != -1) {
-      int index = (packet_summary.start_index + packet_summary.now_frame - packet_summary.start_frame) % PACKET_SUMMARY_SIZE;
-      if (index<0) index += PACKET_SUMMARY_SIZE;
-      p = packet_summary.packets+index;
-      if (p->has_statistics==0) p=NULL;
-      }
-    if (p) {
-
-       if (p->has_beat) { /* if there is a beat */
-         }
-       if (p->has_onset) { /* if there is a note onset */
-         }
-       /* pitch is p->pitch */
-       /* db is a rough db level - just 4 levels */
-       /* p->folded_flags is flags like beat, onset, but folded over a few packets to better match with the video frame rate */
-      } /* if we have good statistics on this packet */
-    if ((packet_summary.commanded_background_color[0] != 0.f)  ||
-        (packet_summary.commanded_background_color[1] != 0.f)  ||
-        (packet_summary.commanded_background_color[2] != 0.f)) { /* if the dj sets a color, use that as a background */
+        // Silent Radiance ---------------------
+        #ifdef SILENTRADIANCE_ON
+            compute_packet_summary();
+            struct packet *p = NULL; // pointer to packet
+            Color this_background = RAYWHITE;
+            // find current packet
+            if (packet_summary.now_frame != 1)
+            {
+                int index = (packet_summary.start_index + packet_summary.now_frame - packet_summary.start_frame) % PACKET_SUMMARY_SIZE;
+                if (index<0) index += PACKET_SUMMARY_SIZE;
+                p = packet_summary.packets+index;
+                if (p->has_statistics == 0) p = NULL;
+            }
+            
+            if (p)
+            {
+                if (p->has_beat)
+                {
+                    // if there is a beat
+                }
+                if (p->has_onset)
+                {
+                    // if there is a note
+                }
+                // pitch is p->pitch
+                // db is a rough db level - just 4 levels
+                // p->folded flas is flags like beat, onset, but folded over a few packets to better match with the video frame rate
+            }
+            
+            if ((packet_summary.commanded_background_color[0] != 0.f)  ||
+                (packet_summary.commanded_background_color[1] != 0.f)  ||
+                (packet_summary.commanded_background_color[2] != 0.f))
+            { /* if the dj sets a color, use that as a background */
       
-      this_background = (Color){(unsigned char)(packet_summary.commanded_background_color[0]*255.f),
-	                        (unsigned char)(packet_summary.commanded_background_color[1]*255.f),
-				(unsigned char)(packet_summary.commanded_background_color[2]*255.f),255};
-      }
-    else {
-      this_background = RAYWHITE;
-      }    
-    
-	   
-			
-    #endif
+                this_background = (Color){(unsigned char)(packet_summary.commanded_background_color[0]*255.f),
+	                    (unsigned char)(packet_summary.commanded_background_color[1]*255.f),
+                        (unsigned char)(packet_summary.commanded_background_color[2]*255.f),255};
+            }
+            else
+            {
+                this_background = RAYWHITE;
+            }    		
+        #endif
+        // --------------------------------------
+        
         // UPDATE
         gameManager.Update();
 
         // Draw
         BeginDrawing();
-#ifdef SILENTRADIANCE_ON
-        ClearBackground(this_background);
-#else
-        ClearBackground(RAYWHITE);
-#endif	
+        #ifdef SILENTRADIANCE_ON
+            ClearBackground(this_background);
+        #else
+            ClearBackground(RAYWHITE);
+        #endif
         gameManager.Draw();
         EndDrawing();
     }
@@ -384,5 +418,3 @@ int main(void)
 
 
 /* end of file main.cpp*/
-
-
