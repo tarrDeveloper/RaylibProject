@@ -73,6 +73,12 @@ extern "C" {
 
 
 // HELPER FUNCTIONS
+float Lerp(float a, float b, float f)
+{
+    return a + (f*(b - a));
+}
+
+
 struct Collision
 {
     bool CircleCircle(int x1, int y1, int r1, int x2, int y2, int r2)
@@ -86,257 +92,230 @@ struct Collision
     }
 } collision;
 
-// MAIN GAME CLASS
-class GameManager
-{
-    public:
-        // Screen Bounds
-        int GAMEWIDTH = 540;
-        int GAMEHEIGHT = 960;
-        
-        // Game State
-        int gameState = 0;
-            // 0 -> Gameplay
-        
-        class GameplayScene
-        {
-            public:
-                // timer for spawning entities
-                int initialSpawnTime = 30;
-                float spawnTimerMax = initialSpawnTime;
-                int spawnTimer = spawnTimerMax;
-                
-                // data for asteroid spawn
-                int spawn = 0;
-                
-                // playerShip
-                class PlayerShip
-                {
-                    public:
-                        // stores position of player
-                        int x = 0;
-                        int y = 896;
-                        
-                        // stores where the player should lerp to
-                        int xto = 0;
-                        int yto = 0;
-                        
-                        // stores the column the player is in
-                        int column = 1;
-                        
-                        // handles the column "flash effect"
-                        int columnAlpha = 0;
-                        
-                        // stores the radius of the player
-                        int radius = 32;
-                    
-                        // UPDATE
-                        void Update()
-                        {
-                            // managing the updating the column
-                            int inp = 0;
-                            if (IsKeyPressed(KEY_RIGHT)) inp++;
-                            if (IsKeyPressed(KEY_LEFT))  inp--;
-                            this->column+=inp;
-                            if (this->column > 2) {this->column = 2; inp = 0; }
-                            if (this->column < 0) {this->column = 0; inp = 0; }
-                            
-                            // setting the xto
-                            this->xto = (270+((this->column)-1)*180);
-                            
-                            // lerping to the xto
-                            this->x = (this->xto+this->x)/2;
-                            
-                            // managing column alpha
-                            if (inp != 0) {
-                                columnAlpha = 255;
-                            } else {
-                                columnAlpha = columnAlpha/1.1;
-                            }
-                        }
-                        // DRAW
-                        void Draw()
-                        {
-                            DrawRectangle(this->xto-90,-32,180,992,(Color){255,255,255,this->columnAlpha});
-                            DrawCircle(this->x,this->y,this->radius,DARKBLUE);
-                        }
-                        // RESET
-                        void Reset()
-                        {
-                            this->column = 1;
-                            this->xto = (270+((this->column)-1)*180);
-                            this->x = this->xto;
-                        }
-                } playerShip;
-     
-                // AsteroidHandler
-                class AsteroidHandler
-                {
-                    public:
-                        // Asteroid (18 max)
-                        class Asteroid
-                        {
-                            public:
-                                // stores position of an individual asteroid
-                                int x;
-                                int y;
-                                
-                                // UPDATE
-                                void Update()
-                                {
-                                    this->y+=16;
-                                }
-                                // DRAW
-                                void Draw()
-                                {
-                                    DrawCircle(this->x,this->y,48,BROWN);
-                                }
-                        } asteroid [20];
-                        
-                        // stores the current number of asteroids
-                        int count = 0;
-                        
-                        // stores the asteoid radius
-                        int radius = 48;
-                        
-                        // CREATE
-                        void Create(int X, int Y)
-                        {
-                            this->asteroid[count].x = X;
-                            this->asteroid[count].y = Y;
-                            this->count++;
-                        }
-                        // DESTROY
-                        void Destroy(int I)
-                        {
-                            for(int i=I;i<20;i++)
-                            {
-                                this->asteroid[i] = this->asteroid[i+1];
-                            }
-                            this->count--;
-                        }
-                        // RESET
-                        void Reset()
-                        {
-                            for(int i=0;i<count;i++)
-                            {
-                                this->asteroid[i].x = 0;
-                                this->asteroid[i].y = 0;
-                            }
-                            this->count = 0;
-                        }
-                        
-                        // UPDATE
-                        void Update()
-                        {
-                            for(int i=0;i<this->count;i++)
-                            {
-                                this->asteroid[i].Update();
-                                if (this->asteroid[i].y > 960+32)
-                                {
-                                    Destroy(i);
-                                    i--;
-                                }
-                            }
-                        }
-                        // DRAW
-                        void Draw()
-                        {
-                            for(int i=0;i<this->count;i++)
-                            {
-                                this->asteroid[i].Draw();
-                            }
-                        }
-                } asteroidHandler;
-                
-                // SCENE RESET
-                void Reset()
-                {
-                    this->playerShip.Reset();
-                    this->asteroidHandler.Reset();
-                    this->spawnTimerMax = this->initialSpawnTime;
-                    this->spawnTimer = this->spawnTimerMax;
-                }
-      
-                // SCENE INIT
-                GameplayScene()
-                {
-                    
-                }
-                // SCENE UPDATE
-                void Update()
-                {
-                    // Updating
-                    this->playerShip.Update();
-                    this->asteroidHandler.Update();
-                    
-                    // Spawning new asteroids
-                    if (this->spawnTimer > 0)
-                    {
-                        this->spawnTimer--;
-                    }
-                    else
-                    {
-                        // changing the ile if chance is greater
-                        if (this->spawn == 0)
-                        {
-                            this->spawn = 1;
-                        }
-                        else if (this->spawn == 1)
-                        {
-                            this->spawn = 2*GetRandomValue(0,1);
-                        }
-                        else if (this->spawn == 2)
-                        {
-                            this->spawn = 1;
-                        }
-                        
-                        // setting previous to off
-                        if (this->spawn != 0) {asteroidHandler.Create(90,-32); }
-                        if (this->spawn != 1) {asteroidHandler.Create(270,-32); }
-                        if (this->spawn != 2) {asteroidHandler.Create(450,-32); }
 
-                        this->spawnTimer = this->spawnTimerMax;
-                        this->spawnTimerMax-=0.5;
-                    }
-                    
-                    // Checking for collisions
-                    for(int i=0;i<asteroidHandler.count;i++)
-                    {
-                        if (collision.CircleCircle(playerShip.x,playerShip.y,playerShip.radius,asteroidHandler.asteroid[i].x,asteroidHandler.asteroid[i].y,asteroidHandler.radius))
-                        {
-                            Reset();
-                        }
-                    }
-                }
-                // SCENE DRAW
-                void Draw()
-                {
-                    this->playerShip.Draw();
-                    this->asteroidHandler.Draw();
-                }
-        } gameplayScene;    
-        // GAME UPDATE
+// TIME CLASS
+class MyTime
+{
+    // stores the deltaTime
+    float deltaTime = 0;
+    
+    public:
+        // UPDATE
         void Update()
         {
-            switch (gameState)
+            deltaTime = GetFrameTime()*GetFPS();
+        }
+        
+       float DeltaTime() { return deltaTime; }
+} myTime;
+
+// BACKGROUND HANDLER
+class Background
+{
+    int offX = 0;
+    int offY = 0;
+    
+    public:
+        void Update(int OFFX = 0)
+        {
+            offY+=1;
+            if (offY >= 180)
             {
-                case 0:
-                    gameplayScene.Update();
-                break;
+                offY -= 180;
             }
-        }   
-        // GAME DRAW
+            offX = OFFX;
+        }
         void Draw()
         {
-        switch (gameState)
-        {
-            case 0:
-                gameplayScene.Draw();
-            break;
+            for(int i=-1;i<5;i++)
+            {
+                for(int j=-1;j<8;j++)
+                {
+                    //DrawCircle(i*32,j*32,8,BLACK);
+                    DrawRectangle((i*180)+1+offX,(j*180)+offY,178,178,BLACK);
+                    //DrawRectangle(xto-90,-32,180,992,(Color){255,255,255,columnAlpha});
+                }
+            }
         }
-    }
-} gameManager;
+} background;
+
+// PLAYER CLASS
+class Player
+{
+    // stores position
+    int x = 0;
+    int y = 896;
+        
+    // stores lerp data
+    int xstart = 0;
+    int ystart = 896;
+    int xto = 0;
+    int yto = 896;
+    float lerpStatus = 1;
+        
+    // stores which "column" the player is in (0, 1, 2)
+    int column = 1;
+    
+    // stores the column alpha for the visual flash
+    float columnAlpha = 0;
+    
+    public:
+        // RESET
+        void Reset()
+        {
+            x = 0;
+            y = 896;
+            xstart = 0;
+            ystart = 896;
+            xto = 0;
+            yto = 896;
+            lerpStatus = 1;
+            column = 1;
+        }
+        // UPDATE
+        void Update(float dt)
+        {
+            // Get input
+            int inp = 0;
+            if (IsKeyPressed(KEY_RIGHT)) inp++;
+            if (IsKeyPressed(KEY_LEFT))  inp--;
+            
+            // Apply input to the column
+            column+=inp;
+            if (column > 2) {column = 2; inp = 0; }
+            if (column < 0) {column = 0; inp = 0; }
+            
+            // Set the xto if there is new input
+            if (inp != 0)
+            {
+                lerpStatus = 0;
+                xstart = x;
+                xto = (270+((this->column)-1)*180);
+                ystart = y;
+                yto = y;
+            }
+            
+            // Moving the ship to the xto
+            if (lerpStatus < 1)
+            {
+                lerpStatus += .07*dt;
+            }
+            if (lerpStatus > 1)
+            {
+                lerpStatus = 1;
+            }
+            float t = lerpStatus/1;
+            t = sin(t * 3.14 * 0.5f);
+            x = Lerp(xstart, xto, t);
+            
+            // AlphaLerp
+           columnAlpha = Lerp(50,0,lerpStatus);
+        }        
+        // DRAW
+        void Draw()
+        {
+            DrawRectangle(xto-90 - ((x-270)/8) ,-32,180,1024,(Color){255,255,255,columnAlpha});
+            DrawCircle(x,y,32,RED);
+        }
+        
+        // GETTERS
+        int X() { return x; }
+        int Y() { return y; }
+} player;
+
+// ASTEROIDS
+class Asteroids
+{
+    // stores the x and y positions of all asteoids
+    int x[20];
+    int y[20];
+    // stores the current number of asteroids
+    int count = 0;
+    
+    // stores spawn data
+    int spawnInterval = 60;
+    int spawnTimer = spawnInterval;
+    int spawnColumn = 0;
+    
+    public:
+        // Creates and asteroid
+        void Create(int xnew, int ynew)
+        {
+            x[count] = xnew;
+            y[count] = ynew;
+            count++;
+        }
+        // Destroys an asteroid
+        void Destroy(int index)
+        {
+            for(int i=index;i<count;i++)
+            {
+                x[i] = x[i+1];
+                y[i] = y[i+1];
+            }
+            count--;
+        }
+        // DestroyAll
+        void DestroyAll()
+        {
+            count = 0;
+        }
+        
+        // UPDATE (updates all asteroids)
+        void Update(float dt)
+        {
+            // spawning asteroids
+            if (spawnTimer > 0)
+            {
+                spawnTimer-=dt;
+            }
+            else
+            {
+                // switching the openening
+                switch (spawnColumn)
+                {
+                    case 0:
+                        spawnColumn = 1;
+                        break;
+                    case 1:
+                        spawnColumn = 2*GetRandomValue(0,1);
+                        break;
+                    case 2:
+                        spawnColumn = 1;
+                        break;
+                }
+                // creating asteoids in all non-empty spaces
+                if (spawnColumn != 0) {Create(90,-32); }
+                if (spawnColumn != 1) {Create(270,-32); }
+                if (spawnColumn != 2) {Create(450,-32); }
+                // resetting spawntimer
+                spawnTimer = spawnInterval;
+            }
+            
+            // updating all of the asteroids
+            for(int i=0;i<count;i++)
+            {
+                y[i] += 12*dt;
+                
+            }
+            for(int i=0;i<count;i++)
+            {
+                if (y[i] > 992)
+                {
+                    Destroy(i);
+                    i--;
+                }
+            }   
+        }
+        // DRAW (draws all asteroids)
+        void Draw()
+        {
+            for(int i=0;i<count;i++)
+            {
+                DrawCircle(x[i],y[i],36,BROWN);
+            }
+        }
+} asteroids;
 
 // MAIN
 int main(void)
@@ -347,8 +326,18 @@ int main(void)
     #endif
     
     // Init window
-    InitWindow(gameManager.GAMEWIDTH, gameManager.GAMEHEIGHT, "");
-    SetTargetFPS(60);
+    InitWindow(540, 960, "");
+    SetTargetFPS(120);
+    SetConfigFlags(FLAG_VSYNC_HINT);
+    
+    // Init camera
+    Camera2D camera = { 0 };
+    camera.offset = (Vector2){ 540/2, 960/2 };
+    camera.rotation = 0.0f;
+    camera.zoom = 1.0f;
+    
+    // Background
+    Color thisBack =  BROWN;
 
     // Main game loop
     while (!WindowShouldClose())    // Detect window close button or ESC key
@@ -357,7 +346,6 @@ int main(void)
         #ifdef SILENTRADIANCE_ON
             compute_packet_summary();
             struct packet *p = NULL; // pointer to packet
-            Color this_background = RAYWHITE;
             // find current packet
             if (packet_summary.now_frame != 1)
             {
@@ -371,21 +359,22 @@ int main(void)
             {
                 if (p->has_beat)
                 {
-                    // if there is a beat
+                    //thisBack = BLUE;
                 }
                 if (p->has_onset)
                 {
-                    // if there is a note
+                    //thisBack = BLUE;
                 }
                 // pitch is p->pitch
                 // db is a rough db level - just 4 levels
                 // p->folded flas is flags like beat, onset, but folded over a few packets to better match with the video frame rate
+                //radianceData.beatScale = 1 + p->pitch/10000;
             }
             
-            if ((packet_summary.commanded_background_color[0] != 0.f)  ||
+            /*if ((packet_summary.commanded_background_color[0] != 0.f)  ||
                 (packet_summary.commanded_background_color[1] != 0.f)  ||
                 (packet_summary.commanded_background_color[2] != 0.f))
-            { /* if the dj sets a color, use that as a background */
+            { /* if the dj sets a color, use that as a background
       
                 this_background = (Color){(unsigned char)(packet_summary.commanded_background_color[0]*255.f),
 	                    (unsigned char)(packet_summary.commanded_background_color[1]*255.f),
@@ -394,21 +383,33 @@ int main(void)
             else
             {
                 this_background = RAYWHITE;
-            }    		
+            }*/    		
         #endif
         // --------------------------------------
         
         // UPDATE
-        gameManager.Update();
+        myTime.Update();
+        player.Update(myTime.DeltaTime());
+        asteroids.Update(myTime.DeltaTime());
+        
+        // Camera and BK
+        background.Update(-(player.X()-270)/8);
+        camera.target = (Vector2){Lerp(player.X(),270,0.9),960/2};
+        camera.zoom = 0.995 + .05*sin(1.5*GetTime());
 
         // Draw
         BeginDrawing();
-        #ifdef SILENTRADIANCE_ON
-            ClearBackground(this_background);
-        #else
-            ClearBackground(RAYWHITE);
-        #endif
-        gameManager.Draw();
+        BeginMode2D(camera);
+        //#ifdef SILENTRADIANCE_ON
+            //ClearBackground(this_background);
+        //#else
+        //thisBack = (Color){GetRandomValue(0,255),GetRandomValue(0,255),GetRandomValue(0,255),255};
+        ClearBackground(thisBack);
+        background.Draw();
+        //#endif
+        player.Draw();
+        asteroids.Draw();
+        EndMode2D();
         EndDrawing();
     }
 
